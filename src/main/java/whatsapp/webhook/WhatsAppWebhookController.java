@@ -2,6 +2,7 @@ package whatsapp.webhook;
 
 import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,8 @@ import org.springframework.http.MediaType;
 @RestController
 @RequestMapping("/webhook")
 public class WhatsAppWebhookController {
+    @Autowired
+    private WhatsAppResponseService responseService;
 
     private static final String VERIFY_TOKEN = "1234";
     private RestTemplate restTemplate = new RestTemplate();
@@ -38,15 +41,13 @@ public class WhatsAppWebhookController {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Verification failed");
     }
 
-    // Webhook event receiver
     @PostMapping
     public ResponseEntity<String> receiveMessage(@RequestBody Map<String, Object> payload) {
 
         try {
-            System.out.println("Incoming Webhook Payload:");
+            System.out.println("========== INCOMING WEBHOOK ==========");
             System.out.println(payload);
 
-            // 🔹 Step 1: entry
             List<Map<String, Object>> entryList =
                     (List<Map<String, Object>>) payload.get("entry");
 
@@ -66,44 +67,125 @@ public class WhatsAppWebhookController {
 
                     if (value == null) continue;
 
-                    // 🔥 only process user messages
-                    if (!value.containsKey("messages")) continue;
+                    // ================= PHONE =================
+                    String phone = null;
+
+                    List<Map<String, Object>> contacts =
+                            (List<Map<String, Object>>) value.get("contacts");
+
+                    if (contacts != null && !contacts.isEmpty()) {
+                        phone = contacts.get(0).get("wa_id").toString();
+                    }
 
                     List<Map<String, Object>> messages =
                             (List<Map<String, Object>>) value.get("messages");
 
+                    if (messages == null) continue;
+
                     for (Map<String, Object> message : messages) {
 
-                        if (!"interactive".equals(message.get("type"))) continue;
+                        if (phone == null && message.get("from") != null) {
+                            phone = message.get("from").toString();
+                        }
 
-                        String phone = (String) message.get("from");
+                        System.out.println("📱 PHONE: " + phone);
 
+                        // ================= INTERACTIVE =================
                         Map<String, Object> interactive =
                                 (Map<String, Object>) message.get("interactive");
+
+                        if (interactive == null) {
+                            System.out.println("❌ interactive missing");
+                            continue;
+                        }
 
                         Map<String, Object> nfmReply =
                                 (Map<String, Object>) interactive.get("nfm_reply");
 
-                        // 🔥 PO ID
-                        String flowToken = nfmReply.get("flow_token") != null
-                                ? nfmReply.get("flow_token").toString()
-                                : null;
+                        if (nfmReply == null) {
+                            System.out.println("❌ nfm_reply missing");
+                            continue;
+                        }
 
-                        if (flowToken == null) return ok(); // safety
+                        // ================= RESPONSE JSON =================
+                        Object responseObj = nfmReply.get("response_json");
 
-// remove extra prefix
-                        String poId = flowToken.startsWith("PO_")
-                                ? flowToken.substring(3)
-                                : flowToken;
-                        // 🔥 Action
+                        Map<String, Object> responseJson = null;
+
                         ObjectMapper objectMapper = new ObjectMapper();
 
-                        String responseJsonStr = nfmReply.get("response_json").toString();
+                        try {
+                            if (responseObj instanceof String) {
+                                responseJson = objectMapper.readValue(
+                                        (String) responseObj, Map.class);
+                            } else if (responseObj instanceof Map) {
+                                responseJson = (Map<String, Object>) responseObj;
+                            }
+                        } catch (Exception ex) {
+                            System.out.println("❌ Failed to parse response_json");
+                            ex.printStackTrace();
+                            continue;
+                        }
 
-                        Map<String, Object> responseJson =
-                                objectMapper.readValue(responseJsonStr, Map.class);
+                        if (responseJson == null) {
+                            System.out.println("❌ responseJson null");
+                            continue;
+                        }
 
+                        System.out.println("📦 RESPONSE JSON: " + responseJson);
+
+                        // ================= PO ID EXTRACTION =================
+                        String poId = null;
+
+                        // Case 1: po_id
+                        if (responseJson.get("po_id") != null) {
+                            poId = responseJson.get("po_id").toString();
+                        }
+
+                        // Case 2: flow_token inside response_json
+                        if (poId == null && responseJson.get("flow_token") != null) {
+                            String flowToken = responseJson.get("flow_token").toString();
+
+                            if (flowToken != null && !"unused".equalsIgnoreCase(flowToken)) {
+                                if (flowToken.startsWith("PO_")) {
+                                    poId = flowToken.substring(3);
+                                } else {
+                                    poId = flowToken;
+                                }
+                            }
+                        }
+
+                        // Case 3: flow_token outside
+                        if (poId == null && nfmReply.get("flow_token") != null) {
+                            String flowToken = nfmReply.get("flow_token").toString();
+
+                            if (flowToken != null && !"unused".equalsIgnoreCase(flowToken)) {
+                                if (flowToken.startsWith("PO_")) {
+                                    poId = flowToken.substring(3);
+                                } else {
+                                    poId = flowToken;
+                                }
+                            }
+                        }
+
+                        System.out.println("🧾 PO ID: " + poId);
+
+                        if (poId == null) {
+                            System.out.println("⚠️ PO ID missing, using TEST ID");
+                            poId = "99999"; // temp
+                        }
+
+                        // ================= ACTION =================
                         Object selectObj = responseJson.get("screen_0_Select_0");
+
+                        if (selectObj == null) {
+                            selectObj = responseJson.get("screen_0_Choose_one_0");
+                        }
+
+                        if (selectObj == null) {
+                            System.out.println("❌ selection missing");
+                            continue;
+                        }
 
                         String valueStr;
 
@@ -113,30 +195,45 @@ public class WhatsAppWebhookController {
                             valueStr = selectObj.toString();
                         }
 
+                        System.out.println("🎯 USER SELECTION: " + valueStr);
+
                         String action =
                                 valueStr.contains("Accept") ? "APPROVE" : "REJECT";
 
-                        System.out.println("PO: " + poId +
-                                " Action: " + action +
-                                " Phone: " + phone);
+                        System.out.println("✅ ACTION: " + action);
 
-
-
-                        String appUrl = "https://tiesha-uncast-cher.ngrok-free.dev/whatsapp-action";
-
-                        Map<String, Object> request = new HashMap<>();
-                        request.put("poId", poId);
-                        request.put("phone", phone);
-                        request.put("action", action);
-
-                        HttpHeaders headers = new HttpHeaders();
-                        headers.setContentType(MediaType.APPLICATION_JSON);
-                        headers.add("X-API-KEY", "secret123");
-
-                        HttpEntity<Map<String, Object>> entity =
-                                new HttpEntity<>(request, headers);
-
-                        restTemplate.postForEntity(appUrl, entity, String.class);
+//                        // ================= API CALL =================
+//                        String appUrl =
+//                                "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+//
+//                        Map<String, Object> request = new HashMap<String, Object>();
+//                        request.put("poId", poId);
+//                        request.put("phone", phone);
+//                        request.put("action", action);
+//
+//                        System.out.println("🚀 CALLING API...");
+//                        System.out.println("➡ URL: " + appUrl);
+//                        System.out.println("➡ BODY: " + request);
+//
+//                        HttpHeaders headers = new HttpHeaders();
+//                        headers.setContentType(MediaType.APPLICATION_JSON);
+//                        headers.add("X-API-KEY", "secret123");
+//
+//                        HttpEntity<Map<String, Object>> entity =
+//                                new HttpEntity<Map<String, Object>>(request, headers);
+//
+//                        try {
+//                            ResponseEntity<String> response =
+//                                    restTemplate.postForEntity(appUrl, entity, String.class);
+//
+//                            System.out.println("📡 STATUS: " + response.getStatusCode());
+//                            System.out.println("📡 RESPONSE: " + response.getBody());
+//
+//                        } catch (Exception ex) {
+//                            System.out.println("🔥 API CALL FAILED");
+//                            ex.printStackTrace();
+//                        }
+                        responseService.saveResponse(phone, poId, action, responseJson);
                     }
                 }
             }
@@ -152,5 +249,4 @@ public class WhatsAppWebhookController {
     private ResponseEntity<String> ok() {
         return ResponseEntity.ok("EVENT_RECEIVED");
     }
-
 }
