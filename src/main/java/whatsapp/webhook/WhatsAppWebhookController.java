@@ -6,41 +6,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
+
 import java.util.List;
-import java.util.HashMap;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.MediaType;
+
 @RestController
 @RequestMapping("/webhook")
 public class WhatsAppWebhookController {
+
     @Autowired
     private WhatsAppResponseService responseService;
 
     private static final String VERIFY_TOKEN = "1234";
-    private RestTemplate restTemplate = new RestTemplate();
-    // Webhook verification endpoint
+
+    // ================= VERIFY =================
     @GetMapping
     public ResponseEntity<String> verifyWebhook(
             @RequestParam(value = "hub.mode", required = false) String mode,
             @RequestParam(value = "hub.verify_token", required = false) String token,
             @RequestParam(value = "hub.challenge", required = false) String challenge) {
 
-        System.out.println("Verification Request Received");
-        System.out.println("Mode: " + mode);
-        System.out.println("Token: " + token);
-        System.out.println("Challenge: " + challenge);
-
         if ("subscribe".equals(mode) && VERIFY_TOKEN.equals(token)) {
-            System.out.println("Webhook verified successfully");
             return ResponseEntity.ok(challenge);
         }
 
-        System.out.println("Webhook verification failed");
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Verification failed");
     }
 
+    // ================= RECEIVE =================
     @PostMapping
     public ResponseEntity<String> receiveMessage(@RequestBody Map<String, Object> payload) {
 
@@ -77,15 +69,24 @@ public class WhatsAppWebhookController {
                         phone = contacts.get(0).get("wa_id").toString();
                     }
 
+                    // ================= MESSAGES =================
                     List<Map<String, Object>> messages =
                             (List<Map<String, Object>>) value.get("messages");
 
-                    if (messages == null) continue;
+                    if (messages == null) {
+                        System.out.println("⚠️ Status event → skipping...");
+                        continue;
+                    }
 
                     for (Map<String, Object> message : messages) {
 
                         if (phone == null && message.get("from") != null) {
                             phone = message.get("from").toString();
+                        }
+
+                        if (phone == null) {
+                            System.out.println("❌ Phone missing, skipping...");
+                            continue;
                         }
 
                         System.out.println("📱 PHONE: " + phone);
@@ -111,7 +112,6 @@ public class WhatsAppWebhookController {
                         Object responseObj = nfmReply.get("response_json");
 
                         Map<String, Object> responseJson = null;
-
                         ObjectMapper objectMapper = new ObjectMapper();
 
                         try {
@@ -134,46 +134,48 @@ public class WhatsAppWebhookController {
 
                         System.out.println("📦 RESPONSE JSON: " + responseJson);
 
-                        // ================= PO ID EXTRACTION =================
-                        String poId = null;
+                        // ================= USER NAME =================
+                        String userName = null;
 
-                        // Case 1: po_id
+                        // 1. Try from response_json
+                        if (responseJson.get("name") != null) {
+                            userName = responseJson.get("name").toString();
+                        }
+
+                        // 2. Fallback from WhatsApp profile
+                        if (userName == null && contacts != null && !contacts.isEmpty()) {
+                            Map<String, Object> profile =
+                                    (Map<String, Object>) contacts.get(0).get("profile");
+
+                            if (profile != null && profile.get("name") != null) {
+                                userName = profile.get("name").toString();
+                            }
+                        }
+
+                        System.out.println("👤 USER: " + userName);
+
+                        // ================= PO ID =================
+                        String poId = null;
+                        int level = 0;
+
                         if (responseJson.get("po_id") != null) {
                             poId = responseJson.get("po_id").toString();
                         }
 
-                        // Case 2: flow_token inside response_json
                         if (poId == null && responseJson.get("flow_token") != null) {
-                            String flowToken = responseJson.get("flow_token").toString();
-
-                            if (flowToken != null && !"unused".equalsIgnoreCase(flowToken)) {
-                                if (flowToken.startsWith("PO_")) {
-                                    poId = flowToken.substring(3);
-                                } else {
-                                    poId = flowToken;
-                                }
-                            }
+                            poId = responseJson.get("flow_token").toString();
                         }
 
-                        // Case 3: flow_token outside
                         if (poId == null && nfmReply.get("flow_token") != null) {
-                            String flowToken = nfmReply.get("flow_token").toString();
-
-                            if (flowToken != null && !"unused".equalsIgnoreCase(flowToken)) {
-                                if (flowToken.startsWith("PO_")) {
-                                    poId = flowToken.substring(3);
-                                } else {
-                                    poId = flowToken;
-                                }
-                            }
+                            poId = nfmReply.get("flow_token").toString();
                         }
-
-                        System.out.println("🧾 PO ID: " + poId);
 
                         if (poId == null) {
                             System.out.println("⚠️ PO ID missing, using TEST ID");
-                            poId = "99999"; // temp
+                            poId = "99999";
                         }
+
+                        System.out.println(poId);
 
                         // ================= ACTION =================
                         Object selectObj = responseJson.get("screen_0_Select_0");
@@ -202,38 +204,9 @@ public class WhatsAppWebhookController {
 
                         System.out.println("✅ ACTION: " + action);
 
-//                        // ================= API CALL =================
-//                        String appUrl =
-//                                "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
-//
-//                        Map<String, Object> request = new HashMap<String, Object>();
-//                        request.put("poId", poId);
-//                        request.put("phone", phone);
-//                        request.put("action", action);
-//
-//                        System.out.println("🚀 CALLING API...");
-//                        System.out.println("➡ URL: " + appUrl);
-//                        System.out.println("➡ BODY: " + request);
-//
-//                        HttpHeaders headers = new HttpHeaders();
-//                        headers.setContentType(MediaType.APPLICATION_JSON);
-//                        headers.add("X-API-KEY", "secret123");
-//
-//                        HttpEntity<Map<String, Object>> entity =
-//                                new HttpEntity<Map<String, Object>>(request, headers);
-//
-//                        try {
-//                            ResponseEntity<String> response =
-//                                    restTemplate.postForEntity(appUrl, entity, String.class);
-//
-//                            System.out.println("📡 STATUS: " + response.getStatusCode());
-//                            System.out.println("📡 RESPONSE: " + response.getBody());
-//
-//                        } catch (Exception ex) {
-//                            System.out.println("🔥 API CALL FAILED");
-//                            ex.printStackTrace();
-//                        }
-                        responseService.saveResponse(phone, poId, action, responseJson);
+                        // ================= SAVE =================
+                        responseService.saveResponse(
+                                phone, poId, action, responseJson, userName,level);
                     }
                 }
             }

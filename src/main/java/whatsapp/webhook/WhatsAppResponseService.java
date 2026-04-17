@@ -16,17 +16,34 @@ public class WhatsAppResponseService {
     private ObjectMapper objectMapper;
 
     public void saveResponse(String phone, String poId,
-                             String action, Object responseJson) {
+                             String action, Object responseJson,
+                             String userName,int level) {
+
 
         try {
-            // ✅ Check if FIRST response for this PO
-            boolean isFirst = !repository.existsByPoId(poId);
+            String token = (String) ((java.util.Map) responseJson).get("flow_token");
 
+            String parsedPoId = null;
+            int parsedLevel = 0;
+
+            if (token != null && token.contains("|")) {
+
+                String[] parts = token.split("\\|");
+
+                parsedPoId = parts[0];                  // PO02161
+                parsedLevel = Integer.parseInt(parts[1]); // 1
+
+            } else {
+                parsedPoId = token;
+            }
+            // ✅ Check if FIRST response for this PO
+            boolean isFirst = !repository.existsByPoId(parsedPoId);
             // ✅ ALWAYS SAVE response
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
-            entity.setPoId(poId);
+            entity.setPoId(parsedPoId);
             entity.setAction(action);
+            entity.setUserName(userName);
 
             String json = objectMapper.writeValueAsString(responseJson);
             entity.setResponseJson(json);
@@ -36,15 +53,33 @@ public class WhatsAppResponseService {
             System.out.println("💾 Saved to DB");
 
             // ✅ ONLY FIRST RESPONSE → CALL API
-            if (!isFirst) {
+            if (isFirst) {
+
+                System.out.println("🚀 FIRST RESPONSE → CALLING API");
+
+                callExternalApi(phone, parsedPoId, action, parsedLevel);
+                notifyOtherUsers(phone, parsedPoId, userName);
+            } else {
 
                 System.out.println("⏭️ Already processed → notifying this user");
 
-                sendWhatsAppMessage(phone,
-                          poId + " already processed by another user. No action needed.");
+                // ✅ GET FIRST APPROVER FROM DB
+                WhatsAppResponse firstResponse =
+                        repository.findTopByPoIdOrderByCreatedAtAsc(parsedPoId);
+                String approvedBy = null;
 
-            } else {
-                System.out.println("⏭️ Not first response → API skipped");
+                if (firstResponse != null) {
+                    approvedBy = firstResponse.getUserName();
+
+                    if (approvedBy == null) {
+                        approvedBy = firstResponse.getPhone();
+                    }
+                }
+
+                // ✅ SEND MESSAGE USING FIRST USER
+                sendWhatsAppMessage(phone,
+                        parsedPoId + " already approved..." +
+                                approvedBy + ". No action needed.");
             }
 
         } catch (Exception e) {
@@ -88,10 +123,10 @@ public class WhatsAppResponseService {
         }
     }
     // ✅ THIS MUST BE OUTSIDE saveResponse()
-    private void callExternalApi(String phone, String poId, String action) {
+    private void callExternalApi(String phone, String poId, String action,int level) {
 
         String appUrl =
-                "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+                "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
 
         org.springframework.web.client.RestTemplate restTemplate =
                 new org.springframework.web.client.RestTemplate();
@@ -100,6 +135,7 @@ public class WhatsAppResponseService {
         request.put("poId", poId);
         request.put("phone", phone);
         request.put("action", action);
+        request.put("level", level);  //  ADD THIS
 
         org.springframework.http.HttpHeaders headers =
                 new org.springframework.http.HttpHeaders();
@@ -121,24 +157,34 @@ public class WhatsAppResponseService {
         }
 
     }
-    private void notifyOtherUsers(String firstUser, String poId) {
+    private void notifyOtherUsers(String firstUser, String poId, String userName) {
 
         try {
-            // ✅ Get all responses for this PO
+            // ✅ GET FIRST APPROVER
+            WhatsAppResponse firstResponse =
+                    repository.findTopByPoIdOrderByCreatedAtAsc(poId);
+
+            String approvedBy = null;
+
+            if (firstResponse != null) {
+                approvedBy = firstResponse.getUserName();
+
+                if (approvedBy == null) {
+                    approvedBy = firstResponse.getPhone();
+                }
+            }
+
             List<WhatsAppResponse> responses = repository.findByPoId(poId);
 
             for (WhatsAppResponse res : responses) {
 
                 String userPhone = res.getPhone();
 
-                // ❌ Skip first user
                 if (userPhone.equals(firstUser)) continue;
 
-                // ✅ Send notification
                 sendWhatsAppMessage(userPhone,
-                        "PO " + poId + " already processed by " + firstUser +
-                                ". No action required.");
-
+                          poId + " already approved by " +
+                                approvedBy + ". No action required.");
             }
 
         } catch (Exception e) {

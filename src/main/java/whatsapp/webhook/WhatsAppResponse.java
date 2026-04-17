@@ -24,6 +24,9 @@ public class WhatsAppResponse {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "user_name")
+    private String userName;
+
     public WhatsAppResponse() {
         this.createdAt = LocalDateTime.now();
     }
@@ -60,5 +63,12 @@ public class WhatsAppResponse {
 
     public String getResponseJson() {
         return responseJson;
+    }
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 }
