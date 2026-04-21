@@ -27,11 +27,15 @@ public class WhatsAppResponse {
     @Column(name = "user_name")
     private String userName;
 
+    // 🔥 NEW FIELD (VERY IMPORTANT)
+    @Column(name = "task_id", unique = true)
+    private String taskId;
+
     public WhatsAppResponse() {
         this.createdAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
+    // ================= SETTERS =================
     public void setPhone(String phone) {
         this.phone = phone;
     }
@@ -47,8 +51,17 @@ public class WhatsAppResponse {
     public void setResponseJson(String responseJson) {
         this.responseJson = responseJson;
     }
-    // ✅ ADD THESE METHODS
 
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    // 🔥 NEW SETTER
+    public void setTaskId(String taskId) {
+        this.taskId = taskId;
+    }
+
+    // ================= GETTERS =================
     public String getPhone() {
         return phone;
     }
@@ -64,11 +77,13 @@ public class WhatsAppResponse {
     public String getResponseJson() {
         return responseJson;
     }
+
     public String getUserName() {
         return userName;
     }
 
-    public void setUserName(String userName) {
-        this.userName = userName;
+    // 🔥 NEW GETTER
+    public String getTaskId() {
+        return taskId;
     }
 }

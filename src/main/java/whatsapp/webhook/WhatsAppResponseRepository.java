@@ -10,4 +10,9 @@ public interface WhatsAppResponseRepository
     boolean existsByPoIdAndPhone(String poId, String phone);
     List<WhatsAppResponse> findByPoId(String poId);
     WhatsAppResponse findTopByPoIdOrderByCreatedAtAsc(String poId);
+    boolean existsByTaskId(String taskId);
+
+    WhatsAppResponse findTopByTaskIdOrderByCreatedAtAsc(String taskId);
+
+    List<WhatsAppResponse> findByTaskId(String taskId);
 }

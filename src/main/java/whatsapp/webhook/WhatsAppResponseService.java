@@ -7,7 +7,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 
 import java.util.*;
-
 @Service
 public class WhatsAppResponseService {
 
@@ -17,96 +16,81 @@ public class WhatsAppResponseService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // ================= MAIN METHOD =================
     public void saveResponse(String phone,
                              String action,
                              Object responseJson,
                              String userName) {
 
         try {
-            // 🔥 Extract flow_token
+
+            // 🔥 EXTRACT FLOW TOKEN
             String token = (String) ((Map) responseJson).get("flow_token");
 
-            System.out.println("FLOW TOKEN RECEIVED: " + token);
-
-            String taskId;
-            int userId;
-            long poId;
-
-            if (token != null && token.contains("|")) {
-
-                String[] parts = token.split("\\|");
-
-                if (parts.length == 3) {
-                    taskId = parts[0];
-                    userId = Integer.parseInt(parts[1]);
-                    poId = Long.parseLong(parts[2]);
-                } else {
-                    throw new RuntimeException("Invalid flow_token format: " + token);
-                }
-
-            } else {
-                throw new RuntimeException("flow_token missing or invalid");
+            if (token == null || !token.contains("|")) {
+                throw new RuntimeException("Invalid flow_token");
             }
 
-            // 🔥 First response check
-            boolean isFirst = !repository.existsByPoId(String.valueOf(poId));
+            String[] parts = token.split("\\|");
 
-            // 🔥 Save response
+            String taskId = parts[0];      // 🔥 KEY FIX
+            int userId = Integer.parseInt(parts[1]);
+            long poId = Long.parseLong(parts[2]);
+
+            System.out.println("TASK ID: " + taskId);
+
+            // 🔥 CHECK IF TASK ALREADY HANDLED (PER LEVEL)
+            boolean alreadyHandled = repository.existsByTaskId(taskId);
+
+            if (alreadyHandled) {
+
+                System.out.println("⚠️ Duplicate click ignored");
+
+                WhatsAppResponse first =
+                        repository.findTopByTaskIdOrderByCreatedAtAsc(taskId);
+
+                String approvedBy = first.getUserName() != null
+                        ? first.getUserName()
+                        : first.getPhone();
+
+                sendWhatsAppMessage(
+                        phone,
+                        "✅ Already approved by " + approvedBy
+                );
+
+                return; // ❗ STOP HERE
+            }
+
+            // 🔥 SAVE FIRST RESPONSE
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
             entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
             entity.setUserName(userName);
+            entity.setTaskId(taskId); // 🔥 IMPORTANT
 
             String json = objectMapper.writeValueAsString(responseJson);
             entity.setResponseJson(json);
 
             repository.save(entity);
 
-            System.out.println("💾 Saved to DB");
+            System.out.println("💾 FIRST APPROVAL SAVED");
 
-            // 🔥 Process FIRST response
-            if (isFirst) {
+            // 🔥 CALL MAIN API
+            callExternalApi(taskId, userId, poId, action);
 
-                System.out.println("🚀 FIRST RESPONSE → APPROVING TASK");
-
-                callExternalApi(taskId, userId, poId, action);
-
-                notifyOtherUsers(phone, String.valueOf(poId), userName);
-
-            } else {
-
-                System.out.println("⏭️ Already processed → notifying this user");
-
-                WhatsAppResponse firstResponse =
-                        repository.findTopByPoIdOrderByCreatedAtAsc(String.valueOf(poId));
-
-                String approvedBy = null;
-
-                if (firstResponse != null) {
-                    approvedBy = firstResponse.getUserName();
-                    if (approvedBy == null) {
-                        approvedBy = firstResponse.getPhone();
-                    }
-                }
-
-                sendWhatsAppMessage(
-                        phone,
-                        "This order already approved by " + approvedBy + ". No action needed."
-                );
-            }
+            // 🔥 NOTIFY OTHER USERS
+            notifyOthers(taskId, phone, userName);
 
         } catch (Exception e) {
-            System.out.println("❌ DB Save Failed");
             e.printStackTrace();
         }
     }
 
-    // 🔥 Call main app
+    // ================= CALL MAIN APP =================
     private void callExternalApi(String taskId, int userId, long poId, String action) {
 
-        String appUrl =
-                "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
 
         RestTemplate restTemplate = new RestTemplate();
 
@@ -118,61 +102,36 @@ public class WhatsAppResponseService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.add("X-API-KEY", "secret123");
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 
         try {
-            ResponseEntity<String> response =
-                    restTemplate.postForEntity(appUrl, entity, String.class);
-
-            System.out.println("📡 STATUS: " + response.getStatusCode());
-
-        } catch (Exception ex) {
-            System.out.println("🔥 API CALL FAILED");
-            ex.printStackTrace();
-        }
-    }
-
-    // 🔔 Notify others
-    private void notifyOtherUsers(String firstUser, String poId, String userName) {
-
-        try {
-            WhatsAppResponse firstResponse =
-                    repository.findTopByPoIdOrderByCreatedAtAsc(poId);
-
-            String approvedBy = null;
-
-            if (firstResponse != null) {
-                approvedBy = firstResponse.getUserName();
-                if (approvedBy == null) {
-                    approvedBy = firstResponse.getPhone();
-                }
-            }
-
-            List<WhatsAppResponse> responses = repository.findByPoId(poId);
-
-            for (WhatsAppResponse res : responses) {
-
-                String userPhone = res.getPhone();
-
-                if (userPhone.equals(firstUser)) continue;
-
-                sendWhatsAppMessage(
-                        userPhone,
-                        "This order already approved by " + approvedBy + ". No action required."
-                );
-            }
-
+            restTemplate.postForEntity(url, entity, String.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // 📩 WhatsApp send
+    // ================= NOTIFY OTHERS =================
+    private void notifyOthers(String taskId, String approvedPhone, String userName) {
+
+        List<WhatsAppResponse> all = repository.findByTaskId(taskId);
+
+        for (WhatsAppResponse res : all) {
+
+            if (res.getPhone().equals(approvedPhone)) continue;
+
+            sendWhatsAppMessage(
+                    res.getPhone(),
+                    "Approved by " + userName
+            );
+        }
+    }
+
+    // ================= SEND MESSAGE =================
     private void sendWhatsAppMessage(String phone, String message) {
 
-        String url = "https://graph.facebook.com/v18.0/1051734401346630/messages";
+        String url = "https://graph.facebook.com/v25.0/1051734401346630/messages";
 
         RestTemplate restTemplate = new RestTemplate();
 
@@ -194,9 +153,7 @@ public class WhatsAppResponseService {
 
         try {
             restTemplate.postForEntity(url, entity, String.class);
-            System.out.println("📩 Notification sent to: " + phone);
         } catch (Exception e) {
-            System.out.println("❌ Failed to send notification");
             e.printStackTrace();
         }
     }
