@@ -3,8 +3,10 @@ package whatsapp.webhook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
 
-import java.util.List;
+import java.util.*;
 
 @Service
 public class WhatsAppResponseService {
@@ -15,33 +17,44 @@ public class WhatsAppResponseService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    public void saveResponse(String phone, String poId,
-                             String action, Object responseJson,
-                             String userName,int level) {
-
+    public void saveResponse(String phone,
+                             String action,
+                             Object responseJson,
+                             String userName) {
 
         try {
-            String token = (String) ((java.util.Map) responseJson).get("flow_token");
+            // 🔥 Extract flow_token
+            String token = (String) ((Map) responseJson).get("flow_token");
 
-            String parsedPoId = null;
-            int parsedLevel = 0;
+            System.out.println("FLOW TOKEN RECEIVED: " + token);
+
+            String taskId;
+            int userId;
+            long poId;
 
             if (token != null && token.contains("|")) {
 
                 String[] parts = token.split("\\|");
 
-                parsedPoId = parts[0];                  // PO02161
-                parsedLevel = Integer.parseInt(parts[1]); // 1
+                if (parts.length == 3) {
+                    taskId = parts[0];
+                    userId = Integer.parseInt(parts[1]);
+                    poId = Long.parseLong(parts[2]);
+                } else {
+                    throw new RuntimeException("Invalid flow_token format: " + token);
+                }
 
             } else {
-                parsedPoId = token;
+                throw new RuntimeException("flow_token missing or invalid");
             }
-            // ✅ Check if FIRST response for this PO
-            boolean isFirst = !repository.existsByPoId(parsedPoId);
-            // ✅ ALWAYS SAVE response
+
+            // 🔥 First response check
+            boolean isFirst = !repository.existsByPoId(String.valueOf(poId));
+
+            // 🔥 Save response
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
-            entity.setPoId(parsedPoId);
+            entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
             entity.setUserName(userName);
 
@@ -52,34 +65,35 @@ public class WhatsAppResponseService {
 
             System.out.println("💾 Saved to DB");
 
-            // ✅ ONLY FIRST RESPONSE → CALL API
+            // 🔥 Process FIRST response
             if (isFirst) {
 
-                System.out.println("🚀 FIRST RESPONSE → CALLING API");
+                System.out.println("🚀 FIRST RESPONSE → APPROVING TASK");
 
-                callExternalApi(phone, parsedPoId, action, parsedLevel);
-                notifyOtherUsers(phone, parsedPoId, userName);
+                callExternalApi(taskId, userId, poId, action);
+
+                notifyOtherUsers(phone, String.valueOf(poId), userName);
+
             } else {
 
                 System.out.println("⏭️ Already processed → notifying this user");
 
-                // ✅ GET FIRST APPROVER FROM DB
                 WhatsAppResponse firstResponse =
-                        repository.findTopByPoIdOrderByCreatedAtAsc(parsedPoId);
+                        repository.findTopByPoIdOrderByCreatedAtAsc(String.valueOf(poId));
+
                 String approvedBy = null;
 
                 if (firstResponse != null) {
                     approvedBy = firstResponse.getUserName();
-
                     if (approvedBy == null) {
                         approvedBy = firstResponse.getPhone();
                     }
                 }
 
-                // ✅ SEND MESSAGE USING FIRST USER
-                sendWhatsAppMessage(phone,
-                        parsedPoId + " already approved..." +
-                                approvedBy + ". No action needed.");
+                sendWhatsAppMessage(
+                        phone,
+                        "This order already approved by " + approvedBy + ". No action needed."
+                );
             }
 
         } catch (Exception e) {
@@ -87,66 +101,29 @@ public class WhatsAppResponseService {
             e.printStackTrace();
         }
     }
-    private void sendWhatsAppMessage(String phone, String message) {
 
-        String url = "https://graph.facebook.com/v18.0/1051734401346630/messages";
-
-        org.springframework.web.client.RestTemplate restTemplate =
-                new org.springframework.web.client.RestTemplate();
-
-        java.util.Map<String, Object> body = new java.util.HashMap<>();
-        body.put("messaging_product", "whatsapp");
-        body.put("to", phone);
-        body.put("type", "text");
-
-        java.util.Map<String, String> text = new java.util.HashMap<>();
-        text.put("body", message);
-
-        body.put("text", text);
-
-        org.springframework.http.HttpHeaders headers =
-                new org.springframework.http.HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-
-        // 🔴 IMPORTANT: replace with your real token
-        headers.setBearerAuth("EAAVTVgUf33UBQxStyqSKHQF3Q3zTVAmeYswTl5yPvngtcjfX2RV5BZBb7mjqFB8ZAUc4WZAZAIGiMZAeisJVpiggiu67dANajEAJubhIL0gzDM4a8ZAsJ34XydBRemPjbEwEZAdCExLR6L5s44ufJHdHeO2qrwoccplGJLiOlGf0yX4upTvJSMwxrwx3uMXXAZDZD");
-
-        org.springframework.http.HttpEntity<java.util.Map<String, Object>> entity =
-                new org.springframework.http.HttpEntity<>(body, headers);
-
-        try {
-            restTemplate.postForEntity(url, entity, String.class);
-            System.out.println("📩 Notification sent to: " + phone);
-        } catch (Exception e) {
-            System.out.println("❌ Failed to send notification");
-            e.printStackTrace();
-        }
-    }
-    // ✅ THIS MUST BE OUTSIDE saveResponse()
-    private void callExternalApi(String phone, String poId, String action,int level) {
+    // 🔥 Call main app
+    private void callExternalApi(String taskId, int userId, long poId, String action) {
 
         String appUrl =
                 "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
 
-        org.springframework.web.client.RestTemplate restTemplate =
-                new org.springframework.web.client.RestTemplate();
+        RestTemplate restTemplate = new RestTemplate();
 
-        java.util.Map<String, Object> request = new java.util.HashMap<>();
+        Map<String, Object> request = new HashMap<>();
+        request.put("taskId", taskId);
+        request.put("userId", userId);
         request.put("poId", poId);
-        request.put("phone", phone);
         request.put("action", action);
-        request.put("level", level);  //  ADD THIS
 
-        org.springframework.http.HttpHeaders headers =
-                new org.springframework.http.HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add("X-API-KEY", "secret123");
 
-        org.springframework.http.HttpEntity<java.util.Map<String, Object>> entity =
-                new org.springframework.http.HttpEntity<>(request, headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 
         try {
-            org.springframework.http.ResponseEntity<String> response =
+            ResponseEntity<String> response =
                     restTemplate.postForEntity(appUrl, entity, String.class);
 
             System.out.println("📡 STATUS: " + response.getStatusCode());
@@ -155,12 +132,12 @@ public class WhatsAppResponseService {
             System.out.println("🔥 API CALL FAILED");
             ex.printStackTrace();
         }
-
     }
+
+    // 🔔 Notify others
     private void notifyOtherUsers(String firstUser, String poId, String userName) {
 
         try {
-            // ✅ GET FIRST APPROVER
             WhatsAppResponse firstResponse =
                     repository.findTopByPoIdOrderByCreatedAtAsc(poId);
 
@@ -168,7 +145,6 @@ public class WhatsAppResponseService {
 
             if (firstResponse != null) {
                 approvedBy = firstResponse.getUserName();
-
                 if (approvedBy == null) {
                     approvedBy = firstResponse.getPhone();
                 }
@@ -182,12 +158,45 @@ public class WhatsAppResponseService {
 
                 if (userPhone.equals(firstUser)) continue;
 
-                sendWhatsAppMessage(userPhone,
-                          poId + " already approved by " +
-                                approvedBy + ". No action required.");
+                sendWhatsAppMessage(
+                        userPhone,
+                        "This order already approved by " + approvedBy + ". No action required."
+                );
             }
 
         } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 📩 WhatsApp send
+    private void sendWhatsAppMessage(String phone, String message) {
+
+        String url = "https://graph.facebook.com/v18.0/1051734401346630/messages";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("messaging_product", "whatsapp");
+        body.put("to", phone);
+        body.put("type", "text");
+
+        Map<String, String> text = new HashMap<>();
+        text.put("body", message);
+
+        body.put("text", text);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth("EAAVTVgUf33UBQ5gLu5xcGlhxEzUiL4IVIN8HHz2px1Ja3kugrujsDcNEqeUlLoUf3J034yvGYgeowEbp7Mt4pFeDjAx4JVTs8HNjhqwM3zVUXn3Eb84tTZBMjMhiZCdKs0krUeIru6AzdZCmMOQ5LlnTBzZBOGEUV3S3WbdQLK5BH4qmj82uh2aNJVCHzAZDZD");
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        try {
+            restTemplate.postForEntity(url, entity, String.class);
+            System.out.println("📩 Notification sent to: " + phone);
+        } catch (Exception e) {
+            System.out.println("❌ Failed to send notification");
             e.printStackTrace();
         }
     }
