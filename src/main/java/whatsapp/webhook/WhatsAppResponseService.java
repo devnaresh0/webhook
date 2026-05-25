@@ -7,6 +7,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 
 import java.util.*;
+
 @Service
 public class WhatsAppResponseService {
 
@@ -24,6 +25,8 @@ public class WhatsAppResponseService {
 
         try {
 
+            System.out.println("========== PROCESSING APPROVAL ==========");
+
             // 🔥 EXTRACT FLOW TOKEN
             String token = (String) ((Map) responseJson).get("flow_token");
 
@@ -33,21 +36,53 @@ public class WhatsAppResponseService {
 
             String[] parts = token.split("\\|");
 
-            String taskId = parts[0];      // 🔥 KEY FIX
+            if (parts.length < 7) {
+                throw new RuntimeException("Invalid token structure: " + token);
+            }
+
+            // 🔥 PARSE TOKEN
+            String taskId = parts[0];
             int userId = Integer.parseInt(parts[1]);
             long poId = Long.parseLong(parts[2]);
+            String poNumber = parts[3];   // ✅ THIS is what you want
+            String vendor = parts[4];
+            String createdBy = parts[5];
+       //     String isSPO = parts[6];
+            int level = Integer.parseInt(parts[6]);   // 🔥 IMPORTANT
 
-            System.out.println("TASK ID: " + taskId);
+            System.out.println("📦 PO: " + poNumber);
+            System.out.println("👤 USER: " + userName);
+            System.out.println("🎯 LEVEL: " + level);
+            System.out.println("🧾 TASK ID: " + taskId);
 
-            // 🔥 CHECK IF TASK ALREADY HANDLED (PER LEVEL)
-            boolean alreadyHandled = repository.existsByTaskId(taskId);
+            // 🔥 DUPLICATE CHECK (LEVEL BASED)
+            boolean alreadyHandled =
+                    repository.existsByTaskIdAndLevel(
+                            taskId,
+                            level
+                    );
 
             if (alreadyHandled) {
 
-                System.out.println("⚠️ Duplicate click ignored");
+                System.out.println("⚠️ DUPLICATE CLICK → LEVEL " + level);
 
-                WhatsAppResponse first =
-                        repository.findTopByTaskIdOrderByCreatedAtAsc(taskId);
+                List<WhatsAppResponse> list =
+                        repository.findByTaskIdAndLevel(
+                                taskId,
+                                level
+                        );
+
+                if (list.isEmpty()) {
+                    System.out.println("⚠️ No existing record found");
+                    return;
+                }
+
+                WhatsAppResponse first = list.get(0);
+
+                if (first == null) {
+                    System.out.println("⚠️ No existing record found for duplicate taskId");
+                    return;
+                }
 
                 String approvedBy = first.getUserName() != null
                         ? first.getUserName()
@@ -55,32 +90,32 @@ public class WhatsAppResponseService {
 
                 sendWhatsAppMessage(
                         phone,
-                        "✅ Already approved by " + approvedBy
+                        poNumber + " ✅ Already approved at Level " + level + " by " + approvedBy
                 );
 
-                return; // ❗ STOP HERE
+                return;
             }
-
-            // 🔥 SAVE FIRST RESPONSE
+            // 🔥 SAVE APPROVAL
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
             entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
+            entity.setTaskId(taskId);
             entity.setUserName(userName);
-            entity.setTaskId(taskId); // 🔥 IMPORTANT
+            entity.setLevel(level); // 🔥 NEW COLUMN
 
             String json = objectMapper.writeValueAsString(responseJson);
             entity.setResponseJson(json);
 
             repository.save(entity);
 
-            System.out.println("💾 FIRST APPROVAL SAVED");
+            System.out.println("💾 LEVEL " + level + " APPROVAL SAVED");
 
-            // 🔥 CALL MAIN API
-            callExternalApi(taskId, userId, poId, action);
+            // 🔥 CALL MAIN WORKFLOW
+            callExternalApi(taskId, userId, poId,poNumber, action);
 
-            // 🔥 NOTIFY OTHER USERS
-            notifyOthers(taskId, phone, userName);
+            // 🔥 NOTIFY SAME LEVEL USERS
+            notifyOthers(poId, level, phone, userName);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -88,18 +123,19 @@ public class WhatsAppResponseService {
     }
 
     // ================= CALL MAIN APP =================
-    private void callExternalApi(String taskId, int userId, long poId, String action) {
+    private void callExternalApi(String taskId, int userId, long poId,String poNumber, String action) {
 
         String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
-
+      //  String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
         RestTemplate restTemplate = new RestTemplate();
 
         Map<String, Object> request = new HashMap<>();
         request.put("taskId", taskId);
         request.put("userId", userId);
         request.put("poId", poId);
+        request.put("poNumber", poNumber);
         request.put("action", action);
-
+      //  request.put("poType", isSPO);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -112,10 +148,11 @@ public class WhatsAppResponseService {
         }
     }
 
-    // ================= NOTIFY OTHERS =================
-    private void notifyOthers(String taskId, String approvedPhone, String userName) {
+    // ================= NOTIFY USERS =================
+    private void notifyOthers(long poId, int level, String approvedPhone, String userName) {
 
-        List<WhatsAppResponse> all = repository.findByTaskId(taskId);
+        List<WhatsAppResponse> all =
+                repository.findByPoIdAndLevel(String.valueOf(poId), level);
 
         for (WhatsAppResponse res : all) {
 
@@ -123,7 +160,7 @@ public class WhatsAppResponseService {
 
             sendWhatsAppMessage(
                     res.getPhone(),
-                    "Approved by " + userName
+                    "Level " + level + " approved by " + userName
             );
         }
     }

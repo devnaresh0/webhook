@@ -15,7 +15,8 @@ public class WhatsAppResponse {
 
     @Column(name = "po_id")
     private String poId;
-
+    @Column(name = "level")
+    private Integer level;
     private String action;
 
     @Column(name = "response_json", columnDefinition = "TEXT")
@@ -85,5 +86,12 @@ public class WhatsAppResponse {
     // 🔥 NEW GETTER
     public String getTaskId() {
         return taskId;
+    }
+    public int getLevel() {
+        return level;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
     }
 }

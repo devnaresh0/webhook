@@ -15,4 +15,14 @@ public interface WhatsAppResponseRepository
     WhatsAppResponse findTopByTaskIdOrderByCreatedAtAsc(String taskId);
 
     List<WhatsAppResponse> findByTaskId(String taskId);
+    List<WhatsAppResponse> findByTaskIdAndLevel(
+            String taskId,
+            int level
+    );
+
+    WhatsAppResponse findTopByPoIdAndLevelOrderByCreatedAtAsc(String poId, int level);
+
+    List<WhatsAppResponse> findByPoIdAndLevel(String poId, int level);
+
+    boolean existsByTaskIdAndLevel(String taskId, int level);
 }
