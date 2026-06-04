@@ -25,6 +25,8 @@ public class WhatsAppResponseService {
 
         try {
 
+
+
             System.out.println("========== PROCESSING APPROVAL ==========");
 
             // 🔥 EXTRACT FLOW TOKEN
@@ -45,7 +47,7 @@ public class WhatsAppResponseService {
             int userId = Integer.parseInt(parts[1]);
             long poId = Long.parseLong(parts[2]);
             String poNumber = parts[3];   // ✅ THIS is what you want
-            String vendor = parts[4];
+            int menuId = Integer.parseInt(parts[4]);
             String createdBy = parts[5];
        //     String isSPO = parts[6];
             int level = Integer.parseInt(parts[6]);   // 🔥 IMPORTANT
@@ -112,7 +114,7 @@ public class WhatsAppResponseService {
             System.out.println("💾 LEVEL " + level + " APPROVAL SAVED");
 
             // 🔥 CALL MAIN WORKFLOW
-            callExternalApi(taskId, userId, poId,poNumber, action);
+            callExternalApi(taskId, userId, poId,poNumber,menuId, action);
 
             // 🔥 NOTIFY SAME LEVEL USERS
             notifyOthers(poId, level, phone, userName);
@@ -123,10 +125,10 @@ public class WhatsAppResponseService {
     }
 
     // ================= CALL MAIN APP =================
-    private void callExternalApi(String taskId, int userId, long poId,String poNumber, String action) {
+    private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action) {
 
-        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
-      //  String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+//        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+        String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
         RestTemplate restTemplate = new RestTemplate();
 
         Map<String, Object> request = new HashMap<>();
@@ -134,6 +136,7 @@ public class WhatsAppResponseService {
         request.put("userId", userId);
         request.put("poId", poId);
         request.put("poNumber", poNumber);
+        request.put("menuId",menuId);
         request.put("action", action);
       //  request.put("poType", isSPO);
         HttpHeaders headers = new HttpHeaders();
