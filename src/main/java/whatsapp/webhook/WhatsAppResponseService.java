@@ -127,8 +127,8 @@ public class WhatsAppResponseService {
     // ================= CALL MAIN APP =================
     private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action) {
 
-//        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
-        String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+ //       String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
         RestTemplate restTemplate = new RestTemplate();
 
         Map<String, Object> request = new HashMap<>();
