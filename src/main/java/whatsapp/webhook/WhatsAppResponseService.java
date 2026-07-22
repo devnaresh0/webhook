@@ -55,6 +55,7 @@ public class WhatsAppResponseService {
             System.out.println("📦 PO: " + poNumber);
             System.out.println("👤 USER: " + userName);
             System.out.println("🎯 LEVEL: " + level);
+            System.out.println("🎯 User: " + createdBy);
             System.out.println("🧾 TASK ID: " + taskId);
 
             // 🔥 DUPLICATE CHECK (LEVEL BASED)
@@ -114,7 +115,7 @@ public class WhatsAppResponseService {
             System.out.println("💾 LEVEL " + level + " APPROVAL SAVED");
 
             // 🔥 CALL MAIN WORKFLOW
-            callExternalApi(taskId, userId, poId,poNumber,menuId, action);
+            callExternalApi(taskId, userId, poId,poNumber,menuId, action,createdBy,level);
 
             // 🔥 NOTIFY SAME LEVEL USERS
             notifyOthers(poId, level, phone, userName);
@@ -125,10 +126,17 @@ public class WhatsAppResponseService {
     }
 
     // ================= CALL MAIN APP =================
-    private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action) {
+    private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action,String createdBy,int level) {
+        String url;
+  //     try{
+ //          url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+//
+//       }catch(Exception e){
+          url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
 
-        String url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
- //       String url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+//       }
+
+
         RestTemplate restTemplate = new RestTemplate();
 
         Map<String, Object> request = new HashMap<>();
@@ -138,6 +146,8 @@ public class WhatsAppResponseService {
         request.put("poNumber", poNumber);
         request.put("menuId",menuId);
         request.put("action", action);
+        request.put("createdBy",createdBy);
+        request.put("level",level);
       //  request.put("poType", isSPO);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
