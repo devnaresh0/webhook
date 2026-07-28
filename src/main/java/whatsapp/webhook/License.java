@@ -16,6 +16,9 @@ public class License {
 
     @Column(name = "activation_key")
     private String activationKey;
+    @Column(name = "balance")
+    private Double balance;
+
 
     @Column(name = "serial_number")
     private String serialNumber;
@@ -107,5 +110,12 @@ public class License {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+    public Double getBalance() {
+        return balance;
+    }
+
+    public void setBalance(Double balance) {
+        this.balance = balance;
     }
 }

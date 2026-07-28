@@ -94,4 +94,17 @@ public class LicenseService {
 
         return response;
     }
+
+    public License getLicenseByDomain(String domain) {
+
+        return licenseRepository.findByDomain(domain)
+                .orElseThrow(() -> new RuntimeException("License not found"));
+    }
+    public Double getBalance(String domain) {
+
+        License license = licenseRepository.findByDomain(domain)
+                .orElseThrow(() -> new RuntimeException("License not found"));
+
+        return license.getBalance();
+    }
 }

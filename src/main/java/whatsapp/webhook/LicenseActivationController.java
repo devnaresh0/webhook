@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/api/license")
 public class LicenseActivationController {
@@ -29,5 +31,10 @@ public class LicenseActivationController {
 
         // Always return the response while debugging
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/balance")
+    public ResponseEntity<Double> getBalance(@RequestParam String domain) {
+        return ResponseEntity.ok(licenseService.getBalance(domain));
     }
 }
