@@ -100,11 +100,41 @@ public class LicenseService {
         return licenseRepository.findByDomain(domain)
                 .orElseThrow(() -> new RuntimeException("License not found"));
     }
+
+    public void deductBalance(String phoneNumberId, double amount) {
+
+        License license = licenseRepository.findByPhoneNumberId(phoneNumberId)
+                .orElseThrow(() -> new RuntimeException("License not found"));
+
+        if (license.getBalance() == null) {
+            license.setBalance(0.0);
+        }
+
+        license.setBalance(license.getBalance() - amount);
+
+        licenseRepository.save(license);
+
+        System.out.println("Balance deducted. New Balance = " + license.getBalance());
+    }
+
     public Double getBalance(String domain) {
 
         License license = licenseRepository.findByDomain(domain)
                 .orElseThrow(() -> new RuntimeException("License not found"));
 
         return license.getBalance();
+    }
+
+    public void processUtilityCharge(String phoneNumberId,
+                                     String recipientNumber,
+                                     double amount) {
+
+        System.out.println("======================================");
+        System.out.println("NEW CONVERSATION");
+        System.out.println("Recipient : " + recipientNumber);
+        System.out.println("Deducting Balance...");
+        System.out.println("======================================");
+
+        deductBalance(phoneNumberId, amount);
     }
 }

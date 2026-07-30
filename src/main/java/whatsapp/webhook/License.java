@@ -7,12 +7,15 @@ import java.util.Date;
 @Table(name = "whatsapp_license")
 public class License {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "token")
     private String token;
+    @Column(name = "phone_number_id")
+    private String phoneNumberId;
 
     @Column(name = "activation_key")
     private String activationKey;
@@ -117,5 +120,12 @@ public class License {
 
     public void setBalance(Double balance) {
         this.balance = balance;
+    }
+    public String getPhoneNumberId() {
+        return phoneNumberId;
+    }
+
+    public void setPhoneNumberId(String phoneNumberId) {
+        this.phoneNumberId = phoneNumberId;
     }
 }

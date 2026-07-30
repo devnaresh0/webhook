@@ -12,6 +12,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/webhook")
 public class WhatsAppWebhookController {
+    @Autowired
+    private LicenseService licenseService;
 
     @Autowired
     private WhatsAppResponseService responseService;
@@ -74,7 +76,106 @@ public class WhatsAppWebhookController {
                             (List<Map<String, Object>>) value.get("messages");
 
                     if (messages == null) {
-                        System.out.println("⚠️ Status event → skipping...");
+
+                        List<Map<String, Object>> statuses =
+                                (List<Map<String, Object>>) value.get("statuses");
+
+                        if (statuses != null && !statuses.isEmpty()) {
+
+                            Map<String, Object> statusEvent = statuses.get(0);
+
+                            String messageId = String.valueOf(statusEvent.get("id"));
+                            String status = String.valueOf(statusEvent.get("status"));
+
+                            Map<String, Object> pricing =
+                                    (Map<String, Object>) statusEvent.get("pricing");
+
+                            if (pricing != null) {
+
+                                boolean billable =
+                                        Boolean.parseBoolean(pricing.get("billable").toString());
+
+                                String category =
+                                        pricing.get("category").toString();
+
+                                String type =
+                                        pricing.get("type").toString();
+
+                                Map<String, Object> metadata =
+                                        (Map<String, Object>) value.get("metadata");
+
+                                String phoneNumberId = "";
+                                String displayPhoneNumber = "";
+
+                                if (metadata != null) {
+
+                                    if (metadata.get("phone_number_id") != null) {
+                                        phoneNumberId = metadata.get("phone_number_id").toString();
+                                    }
+
+                                    if (metadata.get("display_phone_number") != null) {
+                                        displayPhoneNumber = metadata.get("display_phone_number").toString();
+                                    }
+                                }
+
+                                System.out.println("========================================");
+                                System.out.println("Message Id          : " + messageId);
+                                System.out.println("Status              : " + status);
+                                System.out.println("Billable            : " + billable);
+                                System.out.println("Category            : " + category);
+                                System.out.println("Type                : " + type);
+                                System.out.println("Phone Number Id     : " + phoneNumberId);
+                                System.out.println("Display Phone       : " + displayPhoneNumber);
+                                System.out.println("========================================");
+
+                                if ("delivered".equalsIgnoreCase(status)
+                                        && billable
+                                        && "utility".equalsIgnoreCase(category)
+                                        && "regular".equalsIgnoreCase(type)) {
+
+                                    System.out.println("✅ Utility Delivered Message");
+                                    System.out.println("₹0.50 will be deducted.");
+
+                                    try {
+
+                                        String recipientNumber = statusEvent.get("recipient_id").toString();
+
+                                        licenseService.processUtilityCharge(
+                                                phoneNumberId,
+                                                recipientNumber,
+                                                0.50
+                                        );
+
+                                        System.out.println("========================================");
+                                        System.out.println("✅ Balance Deducted Successfully");
+                                        System.out.println("Amount      : ₹0.50");
+                                        System.out.println("Message Id  : " + messageId);
+                                        System.out.println("Phone Id    : " + phoneNumberId);
+                                        System.out.println("========================================");
+
+                                    } catch (Exception ex) {
+
+                                        System.out.println("========================================");
+                                        System.out.println("❌ Balance Deduction Failed");
+                                        System.out.println("Reason : " + ex.getMessage());
+                                        ex.printStackTrace();
+                                        System.out.println("========================================");
+                                    }
+
+                                } else {
+
+                                    System.out.println("========================================");
+                                    System.out.println("ℹ Balance Not Deducted");
+                                    System.out.println("Reason:");
+                                    System.out.println("Status    = " + status);
+                                    System.out.println("Billable  = " + billable);
+                                    System.out.println("Category  = " + category);
+                                    System.out.println("Type      = " + type);
+                                    System.out.println("========================================");
+                                }
+                            }
+                        }
+
                         continue;
                     }
 

@@ -118,7 +118,7 @@ public class WhatsAppResponseService {
             callExternalApi(taskId, userId, poId,poNumber,menuId, action,createdBy,level);
 
             // 🔥 NOTIFY SAME LEVEL USERS
-            notifyOthers(poId, level, phone, userName);
+            notifyOthers(poId, level, phone, createdBy);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -129,10 +129,10 @@ public class WhatsAppResponseService {
     private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action,String createdBy,int level) {
         String url;
   //     try{
- //          url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+           url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
 //
 //       }catch(Exception e){
-          url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+ //         url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
 
 //       }
 
@@ -173,7 +173,7 @@ public class WhatsAppResponseService {
 
             sendWhatsAppMessage(
                     res.getPhone(),
-                    "Level " + level + " approved by " + userName
+                    "Level " + level + " approved  "
             );
         }
     }
