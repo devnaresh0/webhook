@@ -1,15 +1,17 @@
-package whatsapp.webhook;
+package whatsapp.webhook.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
+import whatsapp.webhook.model.WhatsAppResponse;
+import whatsapp.webhook.repository.WhatsAppResponseRepository;
 
 import java.util.*;
 
 @Service
-public class WhatsAppResponseService {
+public class ApprovalService {
 
     @Autowired
     private WhatsAppResponseRepository repository;
@@ -18,10 +20,10 @@ public class WhatsAppResponseService {
     private ObjectMapper objectMapper;
 
     // ================= MAIN METHOD =================
-    public void saveResponse(String phone,
-                             String action,
-                             Object responseJson,
-                             String userName) {
+    public void processApproval(String phone,
+                                String action,
+                                Map<String, Object> responseJson,
+                                String userName) {
 
         try {
 
@@ -202,7 +204,14 @@ public class WhatsAppResponseService {
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         try {
-            restTemplate.postForEntity(url, entity, String.class);
+            ResponseEntity<String> response =
+                    restTemplate.postForEntity(url, entity, String.class);
+
+            System.out.println("========== META SEND MESSAGE RESPONSE ==========");
+            System.out.println("Status Code : " + response.getStatusCode());
+            System.out.println("Headers     : " + response.getHeaders());
+            System.out.println("Body        : " + response.getBody());
+            System.out.println("===============================================");
         } catch (Exception e) {
             e.printStackTrace();
         }

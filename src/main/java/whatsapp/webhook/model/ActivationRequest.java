@@ -1,4 +1,4 @@
-package whatsapp.webhook;
+package whatsapp.webhook.model;
 
 public class ActivationRequest {
 

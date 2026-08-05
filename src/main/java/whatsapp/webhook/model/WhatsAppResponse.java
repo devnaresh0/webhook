@@ -1,4 +1,4 @@
-package whatsapp.webhook;
+package whatsapp.webhook.model;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;

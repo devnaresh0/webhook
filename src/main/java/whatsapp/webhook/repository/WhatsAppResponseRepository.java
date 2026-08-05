@@ -1,6 +1,7 @@
-package whatsapp.webhook;
+package whatsapp.webhook.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import whatsapp.webhook.model.WhatsAppResponse;
 
 import java.util.List;
 

@@ -1,10 +1,11 @@
-package whatsapp.webhook;
+package whatsapp.webhook.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import javax.servlet.http.HttpServletRequest;
+import whatsapp.webhook.model.ActivationRequest;
+import whatsapp.webhook.model.ActivationResponse;
+import whatsapp.webhook.service.LicenseService;
 
 @RestController
 @RequestMapping("/api/license")
@@ -36,5 +37,17 @@ public class LicenseActivationController {
     @GetMapping("/balance")
     public ResponseEntity<Double> getBalance(@RequestParam String domain) {
         return ResponseEntity.ok(licenseService.getBalance(domain));
+    }
+    @GetMapping("/status")
+    public ResponseEntity<Boolean> getStatus(@RequestParam String domain) {
+
+        System.out.println("Controller reached");
+        System.out.println("Domain = [" + domain + "]");
+
+        boolean active = licenseService.isLicenseActive(domain);
+
+        System.out.println("License Active = " + active);
+
+        return ResponseEntity.ok(active);
     }
 }
