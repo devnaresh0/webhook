@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import whatsapp.webhook.service.LicenseService;
 import whatsapp.webhook.service.ApprovalService;
+import whatsapp.webhook.service.UsageService;
 import whatsapp.webhook.service.WebhookService;
 
 @RestController
@@ -19,6 +20,8 @@ public class WhatsAppWebhookController {
     private WebhookService webhookService;
     @Autowired
     private ApprovalService responseService;
+    @Autowired
+    private UsageService usageService;
 
     private static final String VERIFY_TOKEN = "1234";
 
@@ -44,6 +47,21 @@ public class WhatsAppWebhookController {
         webhookService.processWebhook(payload);
 
         return ok();
+    }
+    @GetMapping("/api/usage")
+    public ResponseEntity<?> getUsage(
+            @RequestParam String fromDate,
+            @RequestParam String toDate) {
+
+        System.out.println("========== USAGE API ==========");
+        System.out.println("From Date : " + fromDate);
+        System.out.println("To Date   : " + toDate);
+
+        Object result = usageService.getUsage(fromDate, toDate);
+
+        System.out.println("Response  : " + result);
+
+        return ResponseEntity.ok(result);
     }
 
     private ResponseEntity<String> ok() {

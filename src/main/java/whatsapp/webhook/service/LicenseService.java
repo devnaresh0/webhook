@@ -130,7 +130,10 @@ public class LicenseService {
     }
 
     public void deductBalance(String phoneNumberId, double amount) {
+        System.out.println("Received phoneNumberId = [" + phoneNumberId + "]");
 
+        phoneRepository.findAll().forEach(p ->
+                System.out.println("DB phoneNumberId = [" + p.getPhoneNumberId() + "]"));
         WhatsAppPhoneNumber phone = phoneRepository
                 .findByPhoneNumberId(phoneNumberId)
                 .orElseThrow(() -> new RuntimeException("Phone number not found"));

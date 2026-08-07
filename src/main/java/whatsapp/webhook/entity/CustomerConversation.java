@@ -11,41 +11,46 @@ public class CustomerConversation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "is_sent")
+    private Integer isSent = 0;
 
-    private String domain;
+    @Column(name = "is_delivered")
+    private Integer isDelivered = 0;
 
+    @Column(name = "sent_at")
+    private LocalDateTime sentAt;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
     @Column(name = "phone_number_id")
     private String phoneNumberId;
 
     @Column(name = "customer_phone")
     private String customerPhone;
 
-    @Column(name = "meta_conversation_id")
-    private String metaConversationId;
+    @Column(name = "message_id", unique = true)
+    private String messageId;
 
     @Column(name = "conversation_type")
-    private String conversationType;
+    private String conversationType;     // utility, marketing, authentication
 
-    @Column(name = "opened_at")
-    private LocalDateTime openedAt;
+    @Column(name = "pricing_model")
+    private String pricingModel;         // PMP
 
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
-
-    @Column(name = "last_customer_message_at")
-    private LocalDateTime lastCustomerMessageAt;
-
-    @Column(name = "last_business_message_at")
-    private LocalDateTime lastBusinessMessageAt;
+    @Column(name = "pricing_type")
+    private String pricingType;          // regular, free_customer_service
 
     private Boolean billable;
 
-    @Column(name = "meta_cost")
-    private BigDecimal metaCost;
 
-    private String currency;
 
-    private String status;
+    private String status;               // sent, delivered, read, failed
+
+    @Column(name = "window_opened_at")
+    private LocalDateTime windowOpenedAt;
+
+    @Column(name = "window_expires_at")
+    private LocalDateTime windowExpiresAt;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -53,7 +58,7 @@ public class CustomerConversation {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    // Getters & Setters
+    // ================= GETTERS & SETTERS =================
 
     public Long getId() {
         return id;
@@ -63,13 +68,7 @@ public class CustomerConversation {
         this.id = id;
     }
 
-    public String getDomain() {
-        return domain;
-    }
 
-    public void setDomain(String domain) {
-        this.domain = domain;
-    }
 
     public String getPhoneNumberId() {
         return phoneNumberId;
@@ -87,12 +86,12 @@ public class CustomerConversation {
         this.customerPhone = customerPhone;
     }
 
-    public String getMetaConversationId() {
-        return metaConversationId;
+    public String getMessageId() {
+        return messageId;
     }
 
-    public void setMetaConversationId(String metaConversationId) {
-        this.metaConversationId = metaConversationId;
+    public void setMessageId(String messageId) {
+        this.messageId = messageId;
     }
 
     public String getConversationType() {
@@ -103,36 +102,20 @@ public class CustomerConversation {
         this.conversationType = conversationType;
     }
 
-    public LocalDateTime getOpenedAt() {
-        return openedAt;
+    public String getPricingModel() {
+        return pricingModel;
     }
 
-    public void setOpenedAt(LocalDateTime openedAt) {
-        this.openedAt = openedAt;
+    public void setPricingModel(String pricingModel) {
+        this.pricingModel = pricingModel;
     }
 
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
+    public String getPricingType() {
+        return pricingType;
     }
 
-    public void setExpiresAt(LocalDateTime expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
-    public LocalDateTime getLastCustomerMessageAt() {
-        return lastCustomerMessageAt;
-    }
-
-    public void setLastCustomerMessageAt(LocalDateTime lastCustomerMessageAt) {
-        this.lastCustomerMessageAt = lastCustomerMessageAt;
-    }
-
-    public LocalDateTime getLastBusinessMessageAt() {
-        return lastBusinessMessageAt;
-    }
-
-    public void setLastBusinessMessageAt(LocalDateTime lastBusinessMessageAt) {
-        this.lastBusinessMessageAt = lastBusinessMessageAt;
+    public void setPricingType(String pricingType) {
+        this.pricingType = pricingType;
     }
 
     public Boolean getBillable() {
@@ -143,11 +126,89 @@ public class CustomerConversation {
         this.billable = billable;
     }
 
-    public BigDecimal getMetaCost() {
-        return metaCost;
+
+
+
+
+    public String getStatus() {
+        return status;
     }
 
-    public void setMetaCost(BigDecimal metaCost) {
-        this.metaCost = metaCost;
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getWindowOpenedAt() {
+        return windowOpenedAt;
+    }
+
+    public void setWindowOpenedAt(LocalDateTime windowOpenedAt) {
+        this.windowOpenedAt = windowOpenedAt;
+    }
+
+    public LocalDateTime getWindowExpiresAt() {
+        return windowExpiresAt;
+    }
+
+    public void setWindowExpiresAt(LocalDateTime windowExpiresAt) {
+        this.windowExpiresAt = windowExpiresAt;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+    public LocalDateTime getSentAt() {
+        return sentAt;
+    }
+
+    public void setSentAt(LocalDateTime sentAt) {
+        this.sentAt = sentAt;
+    }
+
+    public LocalDateTime getDeliveredAt() {
+        return deliveredAt;
+    }
+
+    public void setDeliveredAt(LocalDateTime deliveredAt) {
+        this.deliveredAt = deliveredAt;
+    }
+    public Integer getIsSent() {
+        return isSent;
+    }
+
+    public void setIsSent(Integer isSent) {
+        this.isSent = isSent;
+    }
+
+    public Integer getIsDelivered() {
+        return isDelivered;
+    }
+
+    public void setIsDelivered(Integer isDelivered) {
+        this.isDelivered = isDelivered;
     }
 }

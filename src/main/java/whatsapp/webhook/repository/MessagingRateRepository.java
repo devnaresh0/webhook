@@ -12,4 +12,9 @@ public interface MessagingRateRepository
 
     Optional<MessagingRate> findFirstByPricingCategoryIgnoreCase(
             String pricingCategory);
+    Optional<MessagingRate> findFirstByPricingCategoryIgnoreCaseAndPricingModelIgnoreCase(
+            String pricingCategory,
+            String pricingModel);
+
+
 }
