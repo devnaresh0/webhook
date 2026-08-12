@@ -13,8 +13,8 @@ public class WhatsAppPhoneNumber {
 
     private String domain;
 
-    @Column(name = "waba_id")
-    private String wabaId;
+//    @Column(name = "waba_id")
+//    private String wabaId;
 
     @Column(name = "phone_number_id")
     private String phoneNumberId;
@@ -22,8 +22,8 @@ public class WhatsAppPhoneNumber {
     @Column(name = "display_phone_number")
     private String displayPhoneNumber;
 
-    @Column(name = "verified_name")
-    private String verifiedName;
+//    @Column(name = "verified_name")
+//    private String verifiedName;
 
     private String status;
 
@@ -48,13 +48,13 @@ public class WhatsAppPhoneNumber {
         this.domain = domain;
     }
 
-    public String getWabaId() {
-        return wabaId;
-    }
-
-    public void setWabaId(String wabaId) {
-        this.wabaId = wabaId;
-    }
+//    public String getWabaId() {
+//        return wabaId;
+//    }
+//
+//    public void setWabaId(String wabaId) {
+//        this.wabaId = wabaId;
+//    }
 
     public String getPhoneNumberId() {
         return phoneNumberId;
@@ -72,13 +72,13 @@ public class WhatsAppPhoneNumber {
         this.displayPhoneNumber = displayPhoneNumber;
     }
 
-    public String getVerifiedName() {
-        return verifiedName;
-    }
-
-    public void setVerifiedName(String verifiedName) {
-        this.verifiedName = verifiedName;
-    }
+//    public String getVerifiedName() {
+//        return verifiedName;
+//    }
+//
+//    public void setVerifiedName(String verifiedName) {
+//        this.verifiedName = verifiedName;
+//    }
 
     public String getStatus() {
         return status;

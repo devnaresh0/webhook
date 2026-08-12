@@ -22,19 +22,33 @@ public interface CustomerConversationRepository
     Optional<CustomerConversation> findByMessageId(String messageId);
 
     @Query(value =
-            "SELECT DATE(sent_at), " +
+            "SELECT " +
+                    "sent_at, " +
                     "conversation_type, " +
                     "pricing_model, " +
                     "pricing_type, " +
                     "billable, " +
-                    "COUNT(*), " +
-                    "MAX(sent_at) " +
+                    "phone_number_id " +
                     "FROM customer_conversations " +
-                    "WHERE sent_at BETWEEN :fromDate AND :toDate " +
-                    "GROUP BY DATE(sent_at), conversation_type, pricing_model, pricing_type, billable " +
-                    "ORDER BY MAX(sent_at) DESC",
+                    "WHERE phone_number_id = :phoneNumberId " +
+                    "AND sent_at BETWEEN :fromDate AND :toDate " +
+                    "ORDER BY sent_at DESC " +
+                    "LIMIT :pageSize OFFSET :offset",
             nativeQuery = true)
     List<Object[]> getUsage(
+            @Param("phoneNumberId") String phoneNumberId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            @Param("pageSize") int pageSize,
+            @Param("offset") int offset);
+    @Query(value =
+            "SELECT COUNT(*) " +
+                    "FROM customer_conversations " +
+                    "WHERE phone_number_id = :phoneNumberId " +
+                    "AND sent_at BETWEEN :fromDate AND :toDate",
+            nativeQuery = true)
+    long countUsage(
+            @Param("phoneNumberId") String phoneNumberId,
             @Param("fromDate") LocalDateTime fromDate,
             @Param("toDate") LocalDateTime toDate);
 }

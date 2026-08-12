@@ -50,16 +50,26 @@ public class WhatsAppWebhookController {
     }
     @GetMapping("/api/usage")
     public ResponseEntity<?> getUsage(
+            @RequestParam String phoneNumberId,
             @RequestParam String fromDate,
-            @RequestParam String toDate) {
+            @RequestParam String toDate,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
 
         System.out.println("========== USAGE API ==========");
-        System.out.println("From Date : " + fromDate);
-        System.out.println("To Date   : " + toDate);
+        System.out.println("Phone Number ID : " + phoneNumberId);
+        System.out.println("From Date       : " + fromDate);
+        System.out.println("To Date         : " + toDate);
+        System.out.println("Page            : " + page);
+        System.out.println("Page Size       : " + pageSize);
 
-        Object result = usageService.getUsage(fromDate, toDate);
-
-        System.out.println("Response  : " + result);
+        Object result =
+                usageService.getUsage(
+                        phoneNumberId,
+                        fromDate,
+                        toDate,
+                        page,
+                        pageSize);
 
         return ResponseEntity.ok(result);
     }
