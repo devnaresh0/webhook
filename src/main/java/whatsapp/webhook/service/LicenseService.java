@@ -301,4 +301,48 @@ public class LicenseService {
 
         return true;
     }
+    public boolean areWhatsAppCredentialsValid(
+            String domain,
+            String phoneNumberId,
+            String accessToken) {
+
+        BusinessCredentials credentials =
+                credentialsRepository
+                        .findByDomain(domain)
+                        .orElse(null);
+
+        if (credentials == null) {
+
+            System.out.println(
+                    "❌ No credentials found for domain: "
+                            + domain
+            );
+
+            return false;
+        }
+
+        // Phone Number ID is stored in activation_key
+        boolean phoneNumberMatches =
+                phoneNumberId.equals(
+                        credentials.getActivationKey()
+                );
+
+        // WhatsApp Access Token is stored in activation_token
+        boolean tokenMatches =
+                accessToken.equals(
+                        credentials.getActivationToken()
+                );
+
+        System.out.println(
+                "Phone Number ID matches = "
+                        + phoneNumberMatches
+        );
+
+        System.out.println(
+                "Access Token matches = "
+                        + tokenMatches
+        );
+
+        return phoneNumberMatches && tokenMatches;
+    }
 }

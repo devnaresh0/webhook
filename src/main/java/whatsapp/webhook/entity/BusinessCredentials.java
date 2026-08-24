@@ -15,6 +15,7 @@ public class BusinessCredentials {
 
     @Column(name = "serial_number")
     private String serialNumber;
+
     @Column(name = "activation_key")
     private String activationKey;
 
@@ -28,17 +29,20 @@ public class BusinessCredentials {
     private LocalDateTime expiresAt;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt =
+            LocalDateTime.now();
 
-    // Getters & Setters
+    // =====================================================
+    // IP ADDRESS
+    // =====================================================
 
-    public String getActivationKey() {
-        return activationKey;
-    }
+    @Column(name = "ip_address")
+    private String ipAddress;
 
-    public void setActivationKey(String activationKey) {
-        this.activationKey = activationKey;
-    }
+
+    // =====================================================
+    // GETTERS / SETTERS
+    // =====================================================
 
     public Long getId() {
         return id;
@@ -48,6 +52,7 @@ public class BusinessCredentials {
         this.id = id;
     }
 
+
     public String getDomain() {
         return domain;
     }
@@ -55,6 +60,7 @@ public class BusinessCredentials {
     public void setDomain(String domain) {
         this.domain = domain;
     }
+
 
     public String getSerialNumber() {
         return serialNumber;
@@ -64,6 +70,16 @@ public class BusinessCredentials {
         this.serialNumber = serialNumber;
     }
 
+
+    public String getActivationKey() {
+        return activationKey;
+    }
+
+    public void setActivationKey(String activationKey) {
+        this.activationKey = activationKey;
+    }
+
+
     public String getActivationToken() {
         return activationToken;
     }
@@ -71,6 +87,7 @@ public class BusinessCredentials {
     public void setActivationToken(String activationToken) {
         this.activationToken = activationToken;
     }
+
 
     public String getLicenseStatus() {
         return licenseStatus;
@@ -80,19 +97,36 @@ public class BusinessCredentials {
         this.licenseStatus = licenseStatus;
     }
 
+
     public LocalDateTime getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(LocalDateTime expiresAt) {
+    public void setExpiresAt(
+            LocalDateTime expiresAt) {
+
         this.expiresAt = expiresAt;
     }
+
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(
+            LocalDateTime createdAt) {
+
         this.createdAt = createdAt;
+    }
+
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(
+            String ipAddress) {
+
+        this.ipAddress = ipAddress;
     }
 }
