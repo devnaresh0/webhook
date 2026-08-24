@@ -22,6 +22,8 @@ public class LicenseService {
     BusinessCredentialRepository credentialsRepository;
     @Autowired
     private MessagingRateRepository messagingRateRepository;
+    @Autowired
+    private BusinessBalanceTransactionService balanceTransactionService;
 
 
     @Autowired
@@ -128,33 +130,114 @@ public class LicenseService {
         return businessRepository.findById(domain)
                 .orElseThrow(() -> new RuntimeException("Business not found"));
     }
+    public void saveFreeUsageTransaction(
+            String phoneNumberId,
+            String pricingCategory,
+            String pricingType,
+            int messages,
+            String messageId) {
 
-    public void deductBalance(String phoneNumberId, double amount) {
-        System.out.println("Received phoneNumberId = [" + phoneNumberId + "]");
+        WhatsAppPhoneNumber phone =
+                phoneRepository
+                        .findByPhoneNumberId(phoneNumberId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Phone number not found"));
 
-        phoneRepository.findAll().forEach(p ->
-                System.out.println("DB phoneNumberId = [" + p.getPhoneNumberId() + "]"));
-        WhatsAppPhoneNumber phone = phoneRepository
-                .findByPhoneNumberId(phoneNumberId)
-                .orElseThrow(() -> new RuntimeException("Phone number not found"));
-
-        BusinessBalance balance = balanceRepository
-                .findById(phone.getDomain())
-                .orElseThrow(() -> new RuntimeException("Business balance not found"));
+        BusinessBalance balance =
+                balanceRepository
+                        .findById(phone.getDomain())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Business balance not found"));
 
         if (balance.getBalance() == null) {
             balance.setBalance(BigDecimal.ZERO);
         }
 
-        balance.setBalance(
-                balance.getBalance().subtract(BigDecimal.valueOf(amount))
+        BigDecimal currentBalance =
+                balance.getBalance();
+
+        /*
+         * No deduction for free customer service.
+         * Balance remains unchanged.
+         */
+
+        balanceTransactionService.saveUsage(
+                phone.getDomain(),
+                pricingCategory,
+                pricingType,
+                messages,
+                BigDecimal.ZERO,
+                currentBalance,
+                messageId
         );
 
+        System.out.println("======================================");
+        System.out.println("Free Usage Transaction Saved");
+        System.out.println("Message Id      : " + messageId);
+        System.out.println("Category        : " + pricingCategory);
+        System.out.println("Pricing Type    : " + pricingType);
+        System.out.println("Cost            : 0.00");
+        System.out.println("Balance         : " + currentBalance);
+        System.out.println("======================================");
+    }
+    public void deductBalance(
+            String phoneNumberId,
+            double amount,
+            String pricingCategory,
+            String pricingType,
+            int messages,
+            String messageId) {
+
+        WhatsAppPhoneNumber phone =
+                phoneRepository
+                        .findByPhoneNumberId(phoneNumberId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Phone number not found"));
+
+        BusinessBalance balance =
+                balanceRepository
+                        .findById(phone.getDomain())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Business balance not found"));
+
+        if (balance.getBalance() == null) {
+            balance.setBalance(BigDecimal.ZERO);
+        }
+
+        BigDecimal currentBalance =
+                balance.getBalance();
+
+        BigDecimal deduction =
+                BigDecimal.valueOf(amount);
+
+        BigDecimal newBalance =
+                currentBalance.subtract(deduction);
+
+        balance.setBalance(newBalance);
         balance.setLastUpdated(LocalDateTime.now());
 
         balanceRepository.save(balance);
 
-        System.out.println("Balance deducted. New Balance = " + balance.getBalance());
+        // Save EVERY usage transaction,
+        // including zero-cost usage.
+        balanceTransactionService.saveUsage(
+                phone.getDomain(),
+                pricingCategory,
+                pricingType,
+                messages,
+                deduction,
+                newBalance,
+                messageId
+        );
+
+        System.out.println(
+                "Usage transaction saved. " +
+                        "Cost = " + deduction +
+                        ", Balance = " + newBalance);
     }
 
     public Double getBalance(String domain) {
@@ -170,22 +253,32 @@ public class LicenseService {
     }
 
 
-    public void processConversationCharge(String phoneNumberId,
-                                          String pricingCategory) {
+    public void processConversationCharge(
+            String phoneNumberId,
+            String pricingCategory,
+            String pricingType,
+            String messageId) {
 
-        MessagingRate rate = messagingRateRepository
-                .findFirstByPricingCategoryIgnoreCase(pricingCategory)
-                .orElseThrow(() -> new RuntimeException(
-                        "Rate not configured for " + pricingCategory));
+        MessagingRate rate =
+                messagingRateRepository
+                        .findFirstByPricingCategoryIgnoreCase(
+                                pricingCategory)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Rate not configured for "
+                                                + pricingCategory));
 
-        double amount = rate.getPricePerConversation().doubleValue();
+        double amount =
+                rate.getPricePerConversation().doubleValue();
 
-        if (amount <= 0) {
-            System.out.println(pricingCategory + " conversation is free.");
-            return;
-        }
-
-        deductBalance(phoneNumberId, amount);
+        deductBalance(
+                phoneNumberId,
+                amount,
+                pricingCategory,
+                pricingType,
+                1,
+                messageId
+        );
     }
     public boolean isLicenseActive(String domain) {
 

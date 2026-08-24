@@ -89,9 +89,7 @@ public class ApprovalService {
                     return;
                 }
 
-                String approvedBy = first.getUserName() != null
-                        ? first.getUserName()
-                        : first.getPhone();
+                String approvedBy = createdBy;
 
                 sendWhatsAppMessage(
                         phone,
@@ -131,10 +129,10 @@ public class ApprovalService {
     private void callExternalApi(String taskId, int userId, long poId,String poNumber,int menuId, String action,String createdBy,int level) {
         String url;
   //     try{
-           url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
+ //          url = "https://tiesha-uncast-cher.ngrok-free.dev/NexxRetail/api/workflow/whatsapp-action";
 //
 //       }catch(Exception e){
- //         url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
+          url = "http://197.220.114.46:9632/NexxRetail/api/workflow/whatsapp-action";
 
 //       }
 
@@ -175,7 +173,7 @@ public class ApprovalService {
 
             sendWhatsAppMessage(
                     res.getPhone(),
-                    "Level " + level + " approved  "
+                    "Level " + level + " approved  " + userName
             );
         }
     }
