@@ -31,10 +31,20 @@ public class BusinessCredentials {
     @Column(name = "created_at")
     private LocalDateTime createdAt =
             LocalDateTime.now();
+    @Column(name = "is_static_ip")
+    private Boolean isStaticIp;
 
     // =====================================================
     // IP ADDRESS
     // =====================================================
+
+    public Boolean getStaticIp() {
+        return isStaticIp;
+    }
+
+    public void setStaticIp(Boolean staticIp) {
+        isStaticIp = staticIp;
+    }
 
     @Column(name = "ip_address")
     private String ipAddress;
