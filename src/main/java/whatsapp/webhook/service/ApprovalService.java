@@ -242,15 +242,18 @@ public class ApprovalService {
 
 
             // =================================================
-            // 5. STATIC IP
-            // =================================================
+// 5. STATIC IP
+// =================================================
 
             String ipAddress =
                     credentials.getIpAddress();
 
+            if (ipAddress != null) {
+                ipAddress = ipAddress.trim();
+            }
 
             if (ipAddress == null ||
-                    ipAddress.trim().isEmpty()) {
+                    ipAddress.isEmpty()) {
 
                 System.out.println(
                         "❌ Static IP is not configured for domain: "
@@ -260,19 +263,22 @@ public class ApprovalService {
                 return;
             }
 
-
             System.out.println(
-                    "IP Address = " + ipAddress
+                    "IP Address = [" + ipAddress + "]"
             );
 
 
-            // =================================================
-            // 6. BUILD MAIN APP URL
-            // =================================================
+// =================================================
+// 6. BUILD MAIN APP URL
+// =================================================
 
             String url =
                     ipAddress
                             + "/NexxRetail/api/workflow/whatsapp-action";
+
+            System.out.println(
+                    "Main App URL = [" + url + "]"
+            );
 
 
             System.out.println(

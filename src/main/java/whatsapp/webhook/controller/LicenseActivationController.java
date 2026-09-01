@@ -58,6 +58,15 @@ public class LicenseActivationController {
                 "Activation Key : "
                         + request.getActivationKey()
         );
+        System.out.println(
+                "Static IP Enabled : "
+                        + request.getStaticIpEnabled()
+        );
+
+        System.out.println(
+                "Static IP URL     : "
+                        + request.getStaticIpUrl()
+        );
 
         System.out.println(
                 "Serial Number  : "

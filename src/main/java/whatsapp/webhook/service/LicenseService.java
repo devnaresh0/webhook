@@ -45,8 +45,7 @@ public class LicenseService {
         BusinessCredentials credentials = credentialsRepository
                 .findByActivationToken(request.getToken())
                 .orElse(null);
-        System.out.println("DB Activation Key : " + credentials.getActivationKey());
-        System.out.println("Request Activation Key : " + request.getActivationKey());
+
         if (credentials == null) {
             System.out.println("ERROR : Invalid Token");
 
@@ -54,6 +53,8 @@ public class LicenseService {
             response.setMessage("Invalid Token");
             return response;
         }
+        System.out.println("DB Activation Key : " + credentials.getActivationKey());
+        System.out.println("Request Activation Key : " + request.getActivationKey());
 //        BusinessCredentials credentials = credentialsRepository
 //                .findByActivationToken(request.getToken())
 //                .orElse(null);
@@ -73,6 +74,29 @@ public class LicenseService {
             response.setMessage("Invalid Activation Key");
             return response;
         }
+        // =========================================
+// SAVE STATIC IP CONFIGURATION
+// =========================================
+
+        credentials.setStaticIp(
+                request.getStaticIpEnabled()
+        );
+
+        credentials.setIpAddress(
+                request.getStaticIpUrl()
+        );
+
+        credentialsRepository.save(credentials);
+
+        System.out.println(
+                "Static IP Enabled : "
+                        + credentials.getStaticIp()
+        );
+
+        System.out.println(
+                "Static IP Address : "
+                        + credentials.getIpAddress()
+        );
 
         if (!credentials.getSerialNumber().equalsIgnoreCase(request.getSerialNumber())) {
 

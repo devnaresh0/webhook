@@ -40,10 +40,7 @@ public class WebhookPollingController {
 
         try {
 
-            // =================================================
-            // 1. CHECK AUTHORIZATION HEADER
-            // =================================================
-
+            // 1. Validate token
             if (authorization == null ||
                     !authorization.startsWith("Bearer ")) {
 
@@ -52,32 +49,15 @@ public class WebhookPollingController {
                         .body("Missing access token");
             }
 
-
-            // =================================================
-            // 2. GET ACCESS TOKEN
-            // =================================================
-
             String accessToken =
                     authorization.substring(7).trim();
 
 
-            if (accessToken.isEmpty()) {
-
-                return ResponseEntity
-                        .status(401)
-                        .body("Invalid access token");
-            }
-
-
-            // =================================================
-            // 3. FIND BUSINESS USING ACTIVATION TOKEN
-            // =================================================
-
+            // 2. Find business using activation_token
             BusinessCredentials credentials =
                     businessCredentialsRepository
                             .findByActivationToken(accessToken)
                             .orElse(null);
-
 
             if (credentials == null) {
 
@@ -87,12 +67,7 @@ public class WebhookPollingController {
             }
 
 
-            // =================================================
-            // 4. VERIFY WHATSAPP ID
-            //
-            // activation_key = WhatsApp ID
-            // =================================================
-
+            // 3. Verify WhatsApp ID
             if (credentials.getActivationKey() == null ||
                     !credentials.getActivationKey()
                             .equals(whatsappId)) {
@@ -103,18 +78,12 @@ public class WebhookPollingController {
             }
 
 
-            // =================================================
-            // 5. GET DOMAIN
-            // =================================================
-
+            // 4. Get domain
             String domain =
                     credentials.getDomain();
 
 
-            // =================================================
-            // 6. GET PENDING MESSAGES
-            // =================================================
-
+            // 5. Get pending messages
             List<PendingWebhookMessage> messages =
                     pendingWebhookMessageRepository
                             .findByDomainAndWhatsappIdAndStatusOrderByCreatedAtAsc(
@@ -124,12 +93,8 @@ public class WebhookPollingController {
                             );
 
 
-            // =================================================
-            // 7. RETURN MESSAGES
-            // =================================================
-
+            // 6. Return JSON
             return ResponseEntity.ok(messages);
-
 
         } catch (Exception e) {
 
