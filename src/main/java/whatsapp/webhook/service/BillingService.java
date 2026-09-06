@@ -224,6 +224,13 @@ public class BillingService {
 
                 System.out.println(
                         "======================================");
+                throw new RuntimeException(
+                        "Free usage ledger failed for messageId="
+                                + messageId
+                                + ": "
+                                + ex.getMessage(),
+                        ex
+                );
             }
 
             return;
@@ -324,6 +331,13 @@ public class BillingService {
 
             System.out.println(
                     "======================================");
+            throw new RuntimeException(
+                    "Balance deduction failed for messageId="
+                            + messageId
+                            + ": "
+                            + ex.getMessage(),
+                    ex
+            );
         }
     }
 }

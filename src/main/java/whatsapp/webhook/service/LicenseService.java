@@ -11,6 +11,8 @@ import whatsapp.webhook.repository.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class LicenseService {
@@ -65,7 +67,33 @@ public class LicenseService {
         System.out.println("DB Domain         : " + credentials.getDomain());
         System.out.println("DB Expiry         : " + credentials.getExpiresAt());
         System.out.println("DB Active         : " + credentials.getLicenseStatus());
+        System.out.println("========== SERIAL DEBUG ==========");
+        System.out.println("DB Serial      = [" + credentials.getSerialNumber() + "]");
+        System.out.println("Request Serial  = [" + request.getSerialNumber() + "]");
 
+        System.out.println("DB Length      = " +
+                (credentials.getSerialNumber() == null
+                        ? "NULL"
+                        : credentials.getSerialNumber().length()));
+
+        System.out.println("Request Length = " +
+                (request.getSerialNumber() == null
+                        ? "NULL"
+                        : request.getSerialNumber().length()));
+
+        System.out.println("Equals         = " +
+                credentials.getSerialNumber().equals(request.getSerialNumber()));
+
+        System.out.println("Ignore Case    = " +
+                credentials.getSerialNumber().equalsIgnoreCase(request.getSerialNumber()));
+
+        System.out.println("DB hash        = " +
+                credentials.getSerialNumber().hashCode());
+
+        System.out.println("Request hash   = " +
+                request.getSerialNumber().hashCode());
+
+        System.out.println("=================================");
         if (!credentials.getActivationKey().equals(request.getActivationKey())) {
 
             System.out.println("ERROR : Activation Key Mismatch");
@@ -182,6 +210,7 @@ public class LicenseService {
         BigDecimal currentBalance =
                 balance.getBalance();
 
+
         /*
          * No deduction for free customer service.
          * Balance remains unchanged.
@@ -193,7 +222,7 @@ public class LicenseService {
                 pricingType,
                 messages,
                 BigDecimal.ZERO,
-                currentBalance,
+                currentBalance,       // <-- BALANCE IS PASSED HERE
                 messageId
         );
 
@@ -266,16 +295,51 @@ public class LicenseService {
 
     public Double getBalance(String domain) {
 
-        BusinessBalance balance = balanceRepository.findById(domain)
-                .orElseThrow(() -> new RuntimeException("Business balance not found"));
+        Map<String, Object> details =
+                getBalanceDetails(domain);
 
-        if (balance.getBalance() == null) {
-            return 0.0;
+        if (details == null) {
+            throw new RuntimeException(
+                    "Business balance not found"
+            );
         }
 
-        return balance.getBalance().doubleValue();
+        return ((Number) details.get("balance"))
+                .doubleValue();
     }
+    public Map<String, Object> getBalanceDetails(String domain) {
 
+        BusinessBalance row =
+                balanceRepository
+                        .findById(domain)
+                        .orElse(null);
+
+        if (row == null) {
+            return null;
+        }
+
+        Map<String, Object> result =
+                new HashMap<String, Object>();
+
+        result.put("domain", domain);
+
+        double amount = 0.0;
+        if (row.getBalance() != null) {
+            amount = row.getBalance().doubleValue();
+        }
+        result.put("balance", amount);
+
+        String currency = "INR";
+        if (row.getCurrency() != null
+                && !row.getCurrency().trim().isEmpty()) {
+            currency = row.getCurrency().trim();
+        }
+        result.put("currency", currency);
+
+        result.put("lastUpdated", row.getLastUpdated());
+
+        return result;
+    }
 
     public void processConversationCharge(
             String phoneNumberId,

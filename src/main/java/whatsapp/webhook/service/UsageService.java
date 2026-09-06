@@ -65,6 +65,22 @@ public class UsageService {
         // USAGE RECORDS
         // ==========================================
 
+        // ==========================================
+// DEBUG - USAGE QUERY
+// ==========================================
+
+        System.out.println("==========================================");
+        System.out.println("          GET USAGE DEBUG");
+        System.out.println("==========================================");
+        System.out.println("Phone Number ID : [" + phoneNumberId + "]");
+        System.out.println("From Date       : [" + from + "]");
+        System.out.println("To Date         : [" + to + "]");
+        System.out.println("Page            : [" + page + "]");
+        System.out.println("Page Size       : [" + pageSize + "]");
+        System.out.println("Offset          : [" + offset + "]");
+        System.out.println("==========================================");
+
+
         List<Object[]> rows =
                 conversationRepository.getUsage(
                         phoneNumberId,
@@ -75,6 +91,46 @@ public class UsageService {
                 );
 
 
+        System.out.println("==========================================");
+        System.out.println("ROWS RETURNED   : " + rows.size());
+        System.out.println("==========================================");
+
+
+// Print every returned row
+        for (Object[] debugRow : rows) {
+
+            System.out.println(
+                    "MESSAGE ID      : " + debugRow[0]
+            );
+
+            System.out.println(
+                    "SENT AT         : " + debugRow[1]
+            );
+
+            System.out.println(
+                    "CATEGORY        : " + debugRow[2]
+            );
+
+            System.out.println(
+                    "PRICING MODEL   : " + debugRow[3]
+            );
+
+            System.out.println(
+                    "PRICING TYPE    : " + debugRow[4]
+            );
+
+            System.out.println(
+                    "BILLABLE        : " + debugRow[5]
+            );
+
+            System.out.println(
+                    "PHONE NUMBER ID : " + debugRow[6]
+            );
+
+            System.out.println("------------------------------------------");
+        }
+
+
         long totalItems =
                 conversationRepository.countUsage(
                         phoneNumberId,
@@ -82,6 +138,9 @@ public class UsageService {
                         to
                 );
 
+        System.out.println("==========================================");
+        System.out.println("TOTAL ITEMS     : " + totalItems);
+        System.out.println("==========================================");
 
         int totalPages =
                 (int) Math.ceil(

@@ -38,12 +38,8 @@ public class ApprovalService {
                                 String userName) {
 
         try {
-
-
-
             System.out.println("========== PROCESSING APPROVAL ==========");
 
-            // 🔥 EXTRACT FLOW TOKEN
             String token = (String) ((Map) responseJson).get("flow_token");
 
             if (token == null || !token.contains("|")) {
@@ -52,102 +48,60 @@ public class ApprovalService {
 
             String[] parts = token.split("\\|");
 
-            if (parts.length < 7) {
+            if (parts.length < 10) {
                 throw new RuntimeException("Invalid token structure: " + token);
             }
 
-            // 🔥 PARSE TOKEN
             String taskId = parts[0];
             int userId = Integer.parseInt(parts[1]);
             long poId = Long.parseLong(parts[2]);
-            String poNumber = parts[3];   // ✅ THIS is what you want
+            String poNumber = parts[3];
             int menuId = Integer.parseInt(parts[4]);
             String createdBy = parts[5];
-       //     String isSPO = parts[6];
-            int level = Integer.parseInt(parts[6]);   // 🔥 IMPORTANT
+            int level = Integer.parseInt(parts[6]);
             String domain = parts[7];
             int tenantId = Integer.parseInt(parts[8]);
             int localId = Integer.parseInt(parts[9]);
 
-
-            System.out.println("📦 PO: " + poNumber);
-            System.out.println("👤 USER: " + userName);
-            System.out.println("🎯 LEVEL: " + level);
-            System.out.println("🎯 User: " + createdBy);
-            System.out.println("🧾 TASK ID: " + taskId);
-            System.out.println("domain : " + domain);
-
-            // 🔥 DUPLICATE CHECK (LEVEL BASED)
-            boolean alreadyHandled =
-                    repository.existsByTaskIdAndLevel(
-                            taskId,
-                            level
-                    );
-
-            if (alreadyHandled) {
-
-                System.out.println("⚠️ DUPLICATE CLICK → LEVEL " + level);
+            // -------- DUPLICATE CLICK --------
+            if (repository.existsByTaskIdAndLevel(taskId, level)) {
 
                 List<WhatsAppResponse> list =
-                        repository.findByTaskIdAndLevel(
-                                taskId,
-                                level
-                        );
+                        repository.findByTaskIdAndLevel(taskId, level);
 
                 if (list.isEmpty()) {
-                    System.out.println("⚠️ No existing record found");
                     return;
                 }
 
-                WhatsAppResponse first = list.get(0);
-
-                if (first == null) {
-                    System.out.println("⚠️ No existing record found for duplicate taskId");
-                    return;
-                }
-
-                String approvedBy = createdBy;
+                String approvedBy = list.get(0).getUserName();
 
                 sendWhatsAppMessage(
+                        domain,
                         phone,
-                        poNumber + " ✅ Already approved at Level " + level + " by " + approvedBy
+                        poNumber + " ✅ Already approved at Level " + level
+                                + " by " + approvedBy
                 );
-
                 return;
             }
-            // 🔥 SAVE APPROVAL
+
+            // -------- NEW APPROVAL --------
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
             entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
             entity.setTaskId(taskId);
-            entity.setUserName(userName);
-            entity.setLevel(level); // 🔥 NEW COLUMN
-
-            String json = objectMapper.writeValueAsString(responseJson);
-            entity.setResponseJson(json);
+            entity.setUserName(createdBy);    // from token parts[5] — use this in messages
+            entity.setLevel(level);
+            entity.setResponseJson(objectMapper.writeValueAsString(responseJson));
 
             repository.save(entity);
 
-            System.out.println("💾 LEVEL " + level + " APPROVAL SAVED");
-
-            // 🔥 CALL MAIN WORKFLOW
             callExternalApi(
-                    domain,
-                    tenantId,
-                    localId,
-                    taskId,
-                    userId,
-                    poId,
-                    poNumber,
-                    menuId,
-                    action,
-                    createdBy,
-                    level
+                    domain, tenantId, localId, taskId, userId,
+                    poId, poNumber, menuId, action, createdBy, level
             );
 
-            // 🔥 NOTIFY SAME LEVEL USERS
-            notifyOthers(poId, level, phone, createdBy);
+            notifyOthers(domain, poId, level, phone, userName);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -452,26 +406,48 @@ public class ApprovalService {
         }
     }
     // ================= NOTIFY USERS =================
-    private void notifyOthers(long poId, int level, String approvedPhone, String userName) {
+    private void notifyOthers(
+            String domain,
+            long poId,
+            int level,
+            String approvedPhone,
+            String userName) {
 
         List<WhatsAppResponse> all =
                 repository.findByPoIdAndLevel(String.valueOf(poId), level);
 
         for (WhatsAppResponse res : all) {
-
-            if (res.getPhone().equals(approvedPhone)) continue;
+            if (approvedPhone.equals(res.getPhone())) {
+                continue;
+            }
 
             sendWhatsAppMessage(
+                    domain,
                     res.getPhone(),
-                    "Level " + level + " approved  " + userName
+                    "Level " + level + " approved " + userName
             );
         }
     }
-
     // ================= SEND MESSAGE =================
-    private void sendWhatsAppMessage(String phone, String message) {
+    private void sendWhatsAppMessage(String domain, String phone, String message) {
 
-        String url = "https://graph.facebook.com/v25.0/1051734401346630/messages";
+        BusinessCredentials credentials = businessCredentialsRepository
+                .findByDomain(domain)
+                .orElseThrow(() ->
+                        new RuntimeException("Business credentials not found for domain: " + domain));
+
+        String phoneNumberId = credentials.getActivationKey();
+        String accessToken = credentials.getActivationToken();
+
+//        if (phoneNumberId == null || phoneNumberId.isBlank()
+//                || accessToken == null || accessToken.isBlank()) {
+//            System.out.println("❌ WhatsApp credentials missing for domain: " + domain);
+//            return;
+//        }
+
+        String url = "https://graph.facebook.com/v25.0/"
+                + phoneNumberId.trim()
+                + "/messages";
 
         RestTemplate restTemplate = new RestTemplate();
 
@@ -479,15 +455,12 @@ public class ApprovalService {
         body.put("messaging_product", "whatsapp");
         body.put("to", phone);
         body.put("type", "text");
-
         Map<String, String> text = new HashMap<>();
         text.put("body", message);
-
         body.put("text", text);
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth("EAAVTVgUf33UBQ5gLu5xcGlhxEzUiL4IVIN8HHz2px1Ja3kugrujsDcNEqeUlLoUf3J034yvGYgeowEbp7Mt4pFeDjAx4JVTs8HNjhqwM3zVUXn3Eb84tTZBMjMhiZCdKs0krUeIru6AzdZCmMOQ5LlnTBzZBOGEUV3S3WbdQLK5BH4qmj82uh2aNJVCHzAZDZD");
+        headers.setBearerAuth(accessToken.trim());
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
@@ -495,12 +468,10 @@ public class ApprovalService {
             ResponseEntity<String> response =
                     restTemplate.postForEntity(url, entity, String.class);
 
-            System.out.println("========== META SEND MESSAGE RESPONSE ==========");
-            System.out.println("Status Code : " + response.getStatusCode());
-            System.out.println("Headers     : " + response.getHeaders());
-            System.out.println("Body        : " + response.getBody());
-            System.out.println("===============================================");
+            System.out.println("Meta send status: " + response.getStatusCode());
+            System.out.println("Meta send body  : " + response.getBody());
         } catch (Exception e) {
+            System.out.println("❌ Failed to send WhatsApp message for domain: " + domain);
             e.printStackTrace();
         }
     }

@@ -107,15 +107,41 @@ public class LicenseActivationController {
     // =========================================================
 
     @GetMapping("/balance")
-    public ResponseEntity<Double> getBalance(
+    public ResponseEntity<?> getBalance(
             @RequestParam String domain) {
 
-        return ResponseEntity.ok(
-                licenseService.getBalance(domain)
+        System.out.println(
+                "========== GET BALANCE =========="
         );
+        System.out.println(
+                "Domain = [" + domain + "]"
+        );
+
+        Map<String, Object> details =
+                licenseService.getBalanceDetails(domain);
+
+        if (details == null) {
+            System.out.println(
+                    "Business balance not found for domain: "
+                            + domain
+            );
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body(
+                            "Business balance not found for domain: "
+                                    + domain
+                    );
+        }
+
+        System.out.println(
+                "Balance  = " + details.get("balance")
+        );
+        System.out.println(
+                "Currency = " + details.get("currency")
+        );
+
+        return ResponseEntity.ok(details);
     }
-
-
     // =========================================================
     // GET LICENSE STATUS
     // =========================================================
@@ -174,6 +200,20 @@ public class LicenseActivationController {
                     );
 
 
+            double balance = licenseService.getBalance(domain);
+
+            if (balance < 100) {
+
+                System.out.println(
+                        "❌ Insufficient balance: " + balance
+                );
+
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(
+                                "Insufficient balance. Minimum required balance is 0.80"
+                        );
+            }
             // =================================================
             // 2. GET PHONE NUMBER ID
             // =================================================
