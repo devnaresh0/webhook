@@ -110,13 +110,16 @@ public class ConversationService {
 
         String userName = extractUserName(responseJson, contacts);
         String action = extractAction(responseJson);
+        String reason = extractReason(responseJson);
 
         if (action == null) {
             System.out.println("No action selected. keys=" + responseJson.keySet());
             return;
         }
 
-        approvalService.processApproval(phone, action, responseJson, userName);
+        System.out.println("Reason : " + reason);
+
+        approvalService.processApproval(phone, action, responseJson, userName, reason);
     }
 
     @SuppressWarnings("unchecked")
@@ -136,6 +139,19 @@ public class ConversationService {
         }
 
         return null;
+    }
+
+    private String extractReason(Map<String, Object> responseJson) {
+        Object reason = firstNonNull(
+                responseJson.get("reason"),
+                responseJson.get("screen_0_reason"),
+                responseJson.get("screen_RECOMMEND_reason")
+        );
+        if (reason == null) {
+            return null;
+        }
+        String value = reason.toString().trim();
+        return value.isEmpty() ? null : value;
     }
 
     private String extractAction(Map<String, Object> responseJson) {

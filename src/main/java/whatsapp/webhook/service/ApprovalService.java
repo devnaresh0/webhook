@@ -24,21 +24,19 @@ public class ApprovalService {
     @Autowired
     private ObjectMapper objectMapper;
 
-
-
     @Autowired
     private PendingWebhookMessageRepository pendingWebhookMessageRepository;
-
-
 
     // ================= MAIN METHOD =================
     public void processApproval(String phone,
                                 String action,
                                 Map<String, Object> responseJson,
-                                String userName) {
+                                String userName,
+                                String reason) {
 
         try {
             System.out.println("========== PROCESSING APPROVAL ==========");
+            System.out.println("Reason = " + reason);
 
             String token = (String) ((Map) responseJson).get("flow_token");
 
@@ -90,7 +88,7 @@ public class ApprovalService {
             entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
             entity.setTaskId(taskId);
-            entity.setUserName(createdBy);    // from token parts[5] — use this in messages
+            entity.setUserName(createdBy);
             entity.setLevel(level);
             entity.setResponseJson(objectMapper.writeValueAsString(responseJson));
 
@@ -98,7 +96,7 @@ public class ApprovalService {
 
             callExternalApi(
                     domain, tenantId, localId, taskId, userId,
-                    poId, poNumber, menuId, action, createdBy, level
+                    poId, poNumber, menuId, action, createdBy, level, reason
             );
 
             notifyOthers(domain, poId, level, phone, userName);
@@ -120,16 +118,12 @@ public class ApprovalService {
             int menuId,
             String action,
             String createdBy,
-            int level) {
+            int level,
+            String reason) {
 
         try {
 
-            // =================================================
-            // 1. VALIDATE DOMAIN
-            // =================================================
-
             if (domain == null || domain.trim().isEmpty()) {
-
                 System.out.println("❌ Domain is empty.");
                 return;
             }
@@ -138,11 +132,6 @@ public class ApprovalService {
             System.out.println("CALLING MAIN APPLICATION");
             System.out.println("Domain = " + domain);
             System.out.println("==========================================");
-
-
-            // =================================================
-            // 2. FIND BUSINESS BY DOMAIN
-            // =================================================
 
             BusinessCredentials credentials =
                     businessCredentialsRepository
@@ -154,27 +143,11 @@ public class ApprovalService {
                                     )
                             );
 
-
-            // =================================================
-            // 3. CHECK STATIC / NON-STATIC IP
-            // =================================================
-
             Boolean isStaticIp = credentials.getStaticIp();
-
-            System.out.println(
-                    "Is Static IP = " + isStaticIp
-            );
-
-
-            // =================================================
-            // 4. NON-STATIC IP
-            // =================================================
+            System.out.println("Is Static IP = " + isStaticIp);
 
             if (!Boolean.TRUE.equals(isStaticIp)) {
-
-                System.out.println(
-                        "📦 NON-STATIC IP → Saving message for polling"
-                );
+                System.out.println("📦 NON-STATIC IP → Saving message for polling");
 
                 savePendingMessage(
                         credentials,
@@ -188,65 +161,29 @@ public class ApprovalService {
                         menuId,
                         action,
                         createdBy,
-                        level
+                        level,
+                        reason
                 );
-
                 return;
             }
 
-
-            // =================================================
-// 5. STATIC IP
-// =================================================
-
-            String ipAddress =
-                    credentials.getIpAddress();
+            String ipAddress = credentials.getIpAddress();
 
             if (ipAddress != null) {
                 ipAddress = ipAddress.trim();
             }
 
-            if (ipAddress == null ||
-                    ipAddress.isEmpty()) {
-
-                System.out.println(
-                        "❌ Static IP is not configured for domain: "
-                                + domain
-                );
-
+            if (ipAddress == null || ipAddress.isEmpty()) {
+                System.out.println("❌ Static IP is not configured for domain: " + domain);
                 return;
             }
 
-            System.out.println(
-                    "IP Address = [" + ipAddress + "]"
-            );
+            System.out.println("IP Address = [" + ipAddress + "]");
 
+            String url = ipAddress + "/NexxRetail/api/workflow/whatsapp-action";
+            System.out.println("Main App URL = [" + url + "]");
 
-// =================================================
-// 6. BUILD MAIN APP URL
-// =================================================
-
-            String url =
-                    ipAddress
-                            + "/NexxRetail/api/workflow/whatsapp-action";
-
-            System.out.println(
-                    "Main App URL = [" + url + "]"
-            );
-
-
-            System.out.println(
-                    "Main App URL = " + url
-            );
-
-
-            // =================================================
-            // 7. CREATE REQUEST BODY
-            // =================================================
-
-            Map<String, Object> request =
-                    new HashMap<>();
-
+            Map<String, Object> request = new HashMap<>();
             request.put("taskId", taskId);
             request.put("tenantId", tenantId);
             request.put("localId", localId);
@@ -258,78 +195,33 @@ public class ApprovalService {
             request.put("action", action);
             request.put("createdBy", createdBy);
             request.put("level", level);
+            request.put("reason", reason);
 
-
-            // =================================================
-            // 8. HEADERS
-            // =================================================
-
-            HttpHeaders headers =
-                    new HttpHeaders();
-
-            headers.setContentType(
-                    MediaType.APPLICATION_JSON
-            );
-
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> entity =
-                    new HttpEntity<>(
-                            request,
-                            headers
-                    );
+                    new HttpEntity<>(request, headers);
 
-
-            // =================================================
-            // 9. CALL MAIN APPLICATION
-            // =================================================
-
-            RestTemplate restTemplate =
-                    new RestTemplate();
+            RestTemplate restTemplate = new RestTemplate();
 
             ResponseEntity<String> response =
-                    restTemplate.postForEntity(
-                            url,
-                            entity,
-                            String.class
-                    );
+                    restTemplate.postForEntity(url, entity, String.class);
 
-
-            // =================================================
-            // 10. LOG RESPONSE
-            // =================================================
-
-            System.out.println(
-                    "========== MAIN APP RESPONSE =========="
-            );
-
-            System.out.println(
-                    "Status Code : "
-                            + response.getStatusCode()
-            );
-
-            System.out.println(
-                    "Response     : "
-                            + response.getBody()
-            );
-
-            System.out.println(
-                    "========================================"
-            );
-
+            System.out.println("========== MAIN APP RESPONSE ==========");
+            System.out.println("Status Code : " + response.getStatusCode());
+            System.out.println("Response     : " + response.getBody());
+            System.out.println("========================================");
 
         } catch (Exception e) {
-
-            System.out.println(
-                    "❌ ERROR CALLING MAIN APPLICATION"
-            );
-
+            System.out.println("❌ ERROR CALLING MAIN APPLICATION");
             e.printStackTrace();
         }
     }
-    // =====================================================
-// SAVE MESSAGE FOR NON-STATIC IP
-// =====================================================
 
+    // =====================================================
+    // SAVE MESSAGE FOR NON-STATIC IP
+    // =====================================================
     private void savePendingMessage(
             BusinessCredentials credentials,
             String domain,
@@ -342,12 +234,12 @@ public class ApprovalService {
             int menuId,
             String action,
             String createdBy,
-            int level) {
+            int level,
+            String reason) {
 
         try {
 
             Map<String, Object> request = new HashMap<>();
-
             request.put("taskId", taskId);
             request.put("tenantId", tenantId);
             request.put("localId", localId);
@@ -359,52 +251,28 @@ public class ApprovalService {
             request.put("action", action);
             request.put("createdBy", createdBy);
             request.put("level", level);
+            request.put("reason", reason);
 
-            PendingWebhookMessage pending =
-                    new PendingWebhookMessage();
-
+            PendingWebhookMessage pending = new PendingWebhookMessage();
             pending.setDomain(domain);
-
-            pending.setWhatsappId(
-                    credentials.getActivationKey()
-            );
-
+            pending.setWhatsappId(credentials.getActivationKey());
             pending.setTaskId(taskId);
-
-            pending.setPayload(
-                    objectMapper.writeValueAsString(request)
-            );
-
+            pending.setPayload(objectMapper.writeValueAsString(request));
             pending.setStatus("PENDING");
 
             pendingWebhookMessageRepository.save(pending);
 
-            System.out.println(
-                    "✅ NON-STATIC IP MESSAGE SAVED"
-            );
-
-            System.out.println(
-                    "Domain = " + domain
-            );
-
-            System.out.println(
-                    "WhatsApp ID = "
-                            + credentials.getActivationKey()
-            );
-
-            System.out.println(
-                    "Task ID = " + taskId
-            );
+            System.out.println("✅ NON-STATIC IP MESSAGE SAVED");
+            System.out.println("Domain = " + domain);
+            System.out.println("WhatsApp ID = " + credentials.getActivationKey());
+            System.out.println("Task ID = " + taskId);
 
         } catch (Exception e) {
-
-            System.out.println(
-                    "❌ ERROR SAVING PENDING MESSAGE"
-            );
-
+            System.out.println("❌ ERROR SAVING PENDING MESSAGE");
             e.printStackTrace();
         }
     }
+
     // ================= NOTIFY USERS =================
     private void notifyOthers(
             String domain,
@@ -428,6 +296,7 @@ public class ApprovalService {
             );
         }
     }
+
     // ================= SEND MESSAGE =================
     private void sendWhatsAppMessage(String domain, String phone, String message) {
 
@@ -439,12 +308,6 @@ public class ApprovalService {
         String phoneNumberId = credentials.getActivationKey();
         String accessToken = credentials.getActivationToken();
 
-//        if (phoneNumberId == null || phoneNumberId.isBlank()
-//                || accessToken == null || accessToken.isBlank()) {
-//            System.out.println("❌ WhatsApp credentials missing for domain: " + domain);
-//            return;
-//        }
-
         String url = "https://graph.facebook.com/v25.0/"
                 + phoneNumberId.trim()
                 + "/messages";
@@ -455,9 +318,11 @@ public class ApprovalService {
         body.put("messaging_product", "whatsapp");
         body.put("to", phone);
         body.put("type", "text");
+
         Map<String, String> text = new HashMap<>();
         text.put("body", message);
         body.put("text", text);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken.trim());
