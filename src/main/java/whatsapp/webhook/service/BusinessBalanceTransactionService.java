@@ -1,7 +1,9 @@
 package whatsapp.webhook.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import whatsapp.webhook.entity.BusinessBalanceTransaction;
 import whatsapp.webhook.repository.BusinessBalanceTransactionRepository;
 
@@ -73,6 +75,7 @@ public class BusinessBalanceTransactionService {
     }
 
 
+    @Transactional
     public void saveUsage(
             String domain,
             String pricingCategory,
@@ -91,7 +94,7 @@ public class BusinessBalanceTransactionService {
 
             Optional<BusinessBalanceTransaction> existing =
                     transactionRepository
-                            .findByReferenceId(referenceId);
+                            .findByReferenceId(referenceId.trim());
 
             if (existing.isPresent()) {
 
@@ -147,7 +150,9 @@ public class BusinessBalanceTransactionService {
         );
 
         transaction.setReferenceId(
-                referenceId
+                referenceId != null && !referenceId.trim().isEmpty()
+                        ? referenceId.trim()
+                        : null
         );
 
         transaction.setCreatedAt(
@@ -156,12 +161,18 @@ public class BusinessBalanceTransactionService {
 
 
         // =====================================================
-        // 3. SAVE
+        // 3. SAVE (unique index is the race-safe guard)
         // =====================================================
 
-        transactionRepository.save(
-                transaction
-        );
+        try {
+            transactionRepository.save(transaction);
+        } catch (DataIntegrityViolationException e) {
+            System.out.println(
+                    "⚠️ Duplicate usage ignored (unique reference_id): "
+                            + referenceId
+            );
+            return;
+        }
 
         System.out.println(
                 "✅ Usage transaction saved."

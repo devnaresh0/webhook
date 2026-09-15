@@ -13,9 +13,17 @@ import java.util.Optional;
 @Repository
 public interface BusinessBalanceTransactionRepository
         extends JpaRepository<BusinessBalanceTransaction, Long> {
-    Optional<BusinessBalanceTransaction> findByReferenceId(
+
+    /**
+     * Prefer first row if legacy duplicates exist — never throw NonUniqueResultException.
+     */
+    Optional<BusinessBalanceTransaction> findFirstByReferenceIdOrderByIdAsc(
             String referenceId
     );
+
+    default Optional<BusinessBalanceTransaction> findByReferenceId(String referenceId) {
+        return findFirstByReferenceIdOrderByIdAsc(referenceId);
+    }
 
     Optional<BusinessBalanceTransaction>
     findTopByDomainAndTransactionDateLessThanEqualOrderByTransactionDateDescIdDesc(

@@ -5,7 +5,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "business_balance_transactions")
+@Table(
+        name = "business_balance_transactions",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_bbt_reference_id",
+                columnNames = "reference_id"
+        )
+)
 public class BusinessBalanceTransaction {
 
     @Id
@@ -95,10 +101,10 @@ public class BusinessBalanceTransaction {
 
 
     // =====================================================
-    // REFERENCE ID
+    // REFERENCE ID (Meta message id for usage — unique when set)
     // =====================================================
 
-    @Column(name = "reference_id")
+    @Column(name = "reference_id", unique = true)
     private String referenceId;
 
 
