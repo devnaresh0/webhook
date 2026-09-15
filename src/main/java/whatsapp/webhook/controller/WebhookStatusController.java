@@ -1,4 +1,4 @@
-package whatsapp.webhook;
+package whatsapp.webhook.controller;
 
 
 import org.springframework.http.ResponseEntity;
