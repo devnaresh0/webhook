@@ -53,6 +53,7 @@ public class WhatsAppWebhookController {
             @RequestParam String phoneNumberId,
             @RequestParam String fromDate,
             @RequestParam String toDate,
+            @RequestParam(defaultValue = "UTC") String timeZone,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
 
@@ -60,6 +61,7 @@ public class WhatsAppWebhookController {
         System.out.println("Phone Number ID : " + phoneNumberId);
         System.out.println("From Date       : " + fromDate);
         System.out.println("To Date         : " + toDate);
+        System.out.println("Time Zone       : " + timeZone);
         System.out.println("Page            : " + page);
         System.out.println("Page Size       : " + pageSize);
 
@@ -68,10 +70,16 @@ public class WhatsAppWebhookController {
                         phoneNumberId,
                         fromDate,
                         toDate,
+                        timeZone,
                         page,
                         pageSize);
 
         return ResponseEntity.ok(result);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleBadRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
     }
 
     private ResponseEntity<String> ok() {

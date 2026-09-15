@@ -2,6 +2,7 @@ package whatsapp.webhook.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "whatsapp_webhook_log")
@@ -19,7 +20,7 @@ public class WhatsAppWebhookLog {
     private String payload;
 
     @Column(name = "received_at")
-    private LocalDateTime receivedAt = LocalDateTime.now();
+    private LocalDateTime receivedAt = LocalDateTime.now(ZoneOffset.UTC);
 
     // Getters & Setters
 

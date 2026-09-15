@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import whatsapp.webhook.entity.CustomerConversation;
 
-import java.time.LocalDateTime;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,14 +40,14 @@ public interface CustomerConversationRepository
                     "phone_number_id " +
                     "FROM customer_conversations " +
                     "WHERE phone_number_id = :phoneNumberId " +
-                    "AND sent_at BETWEEN :fromDate AND :toDate " +
+                    "AND sent_at >= :fromDate AND sent_at < :toDate " +
                     "ORDER BY sent_at DESC " +
                     "LIMIT :pageSize OFFSET :offset",
             nativeQuery = true)
     List<Object[]> getUsage(
             @Param("phoneNumberId") String phoneNumberId,
-            @Param("fromDate") LocalDateTime fromDate,
-            @Param("toDate") LocalDateTime toDate,
+            @Param("fromDate") Timestamp fromDate,
+            @Param("toDate") Timestamp toDate,
             @Param("pageSize") int pageSize,
             @Param("offset") int offset
     );
@@ -61,12 +61,12 @@ public interface CustomerConversationRepository
             "SELECT COUNT(*) " +
                     "FROM customer_conversations " +
                     "WHERE phone_number_id = :phoneNumberId " +
-                    "AND sent_at BETWEEN :fromDate AND :toDate",
+                    "AND sent_at >= :fromDate AND sent_at < :toDate",
             nativeQuery = true)
     long countUsage(
             @Param("phoneNumberId") String phoneNumberId,
-            @Param("fromDate") LocalDateTime fromDate,
-            @Param("toDate") LocalDateTime toDate
+            @Param("fromDate") Timestamp fromDate,
+            @Param("toDate") Timestamp toDate
     );
 
 
@@ -80,12 +80,12 @@ public interface CustomerConversationRepository
                     "COUNT(*) AS message_count " +
                     "FROM customer_conversations " +
                     "WHERE phone_number_id = :phoneNumberId " +
-                    "AND sent_at BETWEEN :fromDate AND :toDate " +
+                    "AND sent_at >= :fromDate AND sent_at < :toDate " +
                     "GROUP BY LOWER(conversation_type)",
             nativeQuery = true)
     List<Object[]> countMessagesByCategory(
             @Param("phoneNumberId") String phoneNumberId,
-            @Param("fromDate") LocalDateTime fromDate,
-            @Param("toDate") LocalDateTime toDate
+            @Param("fromDate") Timestamp fromDate,
+            @Param("toDate") Timestamp toDate
     );
 }

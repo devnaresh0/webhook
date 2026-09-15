@@ -5,7 +5,6 @@ public class ActivationRequest {
     private String token;
     private String activationKey;
     private String domain;
-    private String serialNumber;
     private Boolean staticIpEnabled;
     private String staticIpUrl;
 
@@ -47,13 +46,5 @@ public class ActivationRequest {
 
     public void setDomain(String domain) {
         this.domain = domain;
-    }
-
-    public String getSerialNumber() {
-        return serialNumber;
-    }
-
-    public void setSerialNumber(String serialNumber) {
-        this.serialNumber = serialNumber;
     }
 }

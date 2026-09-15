@@ -17,6 +17,12 @@ public interface BusinessBalanceTransactionRepository
             String referenceId
     );
 
+    Optional<BusinessBalanceTransaction>
+    findTopByDomainAndTransactionDateLessThanEqualOrderByTransactionDateDescIdDesc(
+            String domain,
+            LocalDateTime transactionDate
+    );
+
     @Query(value =
             "SELECT * " +
                     "FROM business_balance_transactions " +

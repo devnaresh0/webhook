@@ -12,6 +12,7 @@ import whatsapp.webhook.repository.BusinessBalanceTransactionRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -137,7 +138,7 @@ public class TopUpService {
             transaction.setDomain(domain);
 
             transaction.setTransactionDate(
-                    LocalDateTime.now()
+                    LocalDateTime.now(ZoneOffset.UTC)
             );
 
             transaction.setDataType(
@@ -178,7 +179,7 @@ public class TopUpService {
             );
 
             transaction.setCreatedAt(
-                    LocalDateTime.now()
+                    LocalDateTime.now(ZoneOffset.UTC)
             );
 
 
@@ -269,7 +270,7 @@ public class TopUpService {
         );
 
         transaction.setTransactionDate(
-                LocalDateTime.now()
+                LocalDateTime.now(ZoneOffset.UTC)
         );
 
         transaction.setDataType(
@@ -309,7 +310,7 @@ public class TopUpService {
         );
 
         transaction.setCreatedAt(
-                LocalDateTime.now()
+                LocalDateTime.now(ZoneOffset.UTC)
         );
 
 

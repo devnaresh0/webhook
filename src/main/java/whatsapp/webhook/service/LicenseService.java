@@ -10,6 +10,7 @@ import whatsapp.webhook.repository.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,7 +42,6 @@ public class LicenseService {
         System.out.println("========== LICENSE ACTIVATION ==========");
         System.out.println("Request Token          : " + request.getToken());
         System.out.println("Request Activation Key : " + request.getActivationKey());
-        System.out.println("Request Serial Number  : " + request.getSerialNumber());
         System.out.println("Request Domain         : " + request.getDomain());
 
         BusinessCredentials credentials = credentialsRepository
@@ -57,43 +57,10 @@ public class LicenseService {
         }
         System.out.println("DB Activation Key : " + credentials.getActivationKey());
         System.out.println("Request Activation Key : " + request.getActivationKey());
-//        BusinessCredentials credentials = credentialsRepository
-//                .findByActivationToken(request.getToken())
-//                .orElse(null);
         System.out.println("---------- DATABASE VALUES ----------");
         System.out.println("DB Token          : " + credentials.getActivationToken());
-   //     System.out.println("DB Activation Key : " + credentials.getActivationKey());
-        System.out.println("DB Serial Number  : " + credentials.getSerialNumber());
         System.out.println("DB Domain         : " + credentials.getDomain());
-        System.out.println("DB Expiry         : " + credentials.getExpiresAt());
         System.out.println("DB Active         : " + credentials.getLicenseStatus());
-        System.out.println("========== SERIAL DEBUG ==========");
-        System.out.println("DB Serial      = [" + credentials.getSerialNumber() + "]");
-        System.out.println("Request Serial  = [" + request.getSerialNumber() + "]");
-
-        System.out.println("DB Length      = " +
-                (credentials.getSerialNumber() == null
-                        ? "NULL"
-                        : credentials.getSerialNumber().length()));
-
-        System.out.println("Request Length = " +
-                (request.getSerialNumber() == null
-                        ? "NULL"
-                        : request.getSerialNumber().length()));
-
-        System.out.println("Equals         = " +
-                credentials.getSerialNumber().equals(request.getSerialNumber()));
-
-        System.out.println("Ignore Case    = " +
-                credentials.getSerialNumber().equalsIgnoreCase(request.getSerialNumber()));
-
-        System.out.println("DB hash        = " +
-                credentials.getSerialNumber().hashCode());
-
-        System.out.println("Request hash   = " +
-                request.getSerialNumber().hashCode());
-
-        System.out.println("=================================");
         if (!credentials.getActivationKey().equals(request.getActivationKey())) {
 
             System.out.println("ERROR : Activation Key Mismatch");
@@ -126,33 +93,12 @@ public class LicenseService {
                         + credentials.getIpAddress()
         );
 
-        if (!credentials.getSerialNumber().equalsIgnoreCase(request.getSerialNumber())) {
-
-            System.out.println("ERROR : Serial Number Mismatch");
-
-            response.setSuccess(false);
-            response.setMessage("Invalid Serial Number");
-            return response;
-        }
-
         if (!credentials.getDomain().equalsIgnoreCase(request.getDomain())) {
 
             System.out.println("ERROR : Domain Mismatch");
 
             response.setSuccess(false);
             response.setMessage("Domain Mismatch");
-            return response;
-        }
-
-
-
-        if (credentials.getExpiresAt() != null &&
-                credentials.getExpiresAt().isBefore(LocalDateTime.now())) {
-
-            System.out.println("ERROR : License Expired");
-
-            response.setSuccess(false);
-            response.setMessage("License Expired");
             return response;
         }
 
@@ -271,7 +217,7 @@ public class LicenseService {
                 currentBalance.subtract(deduction);
 
         balance.setBalance(newBalance);
-        balance.setLastUpdated(LocalDateTime.now());
+        balance.setLastUpdated(LocalDateTime.now(ZoneOffset.UTC));
 
         balanceRepository.save(balance);
 
@@ -351,17 +297,34 @@ public class LicenseService {
                 messagingRateRepository
                         .findFirstByPricingCategoryIgnoreCase(
                                 pricingCategory)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Rate not configured for "
-                                                + pricingCategory));
+                        .orElse(null);
 
-        double amount =
-                rate.getPricePerConversation().doubleValue();
+        if (rate == null) {
+            System.out.println("======================================");
+            System.out.println("No Usage Transaction");
+            System.out.println("Reason : Rate not configured");
+            System.out.println("Category : " + pricingCategory);
+            System.out.println("Message Id : " + messageId);
+            System.out.println("======================================");
+            return;
+        }
+
+        BigDecimal price = rate.getPricePerConversation();
+
+        if (price == null || price.compareTo(BigDecimal.ZERO) == 0) {
+            System.out.println("======================================");
+            System.out.println("No Usage Transaction");
+            System.out.println("Reason : Rate value is empty / zero");
+            System.out.println("Category : " + pricingCategory);
+            System.out.println("Price    : " + price);
+            System.out.println("Message Id : " + messageId);
+            System.out.println("======================================");
+            return;
+        }
 
         deductBalance(
                 phoneNumberId,
-                amount,
+                price.doubleValue(),
                 pricingCategory,
                 pricingType,
                 1,
@@ -379,11 +342,6 @@ public class LicenseService {
         }
 
         if (!"ACTIVE".equalsIgnoreCase(credentials.getLicenseStatus())) {
-            return false;
-        }
-
-        if (credentials.getExpiresAt() != null &&
-                credentials.getExpiresAt().isBefore(LocalDateTime.now())) {
             return false;
         }
 

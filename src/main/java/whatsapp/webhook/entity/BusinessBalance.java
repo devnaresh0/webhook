@@ -2,7 +2,10 @@ package whatsapp.webhook.entity;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,7 +15,17 @@ import java.time.LocalDateTime;
 public class BusinessBalance {
 
     @Id
+    @Column(name = "domain")
     private String domain;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "domain",
+            referencedColumnName = "domain",
+            insertable = false,
+            updatable = false
+    )
+    private BusinessCredentials businessCredentials;
 
     private String currency;
 
@@ -29,6 +42,10 @@ public class BusinessBalance {
 
     public void setDomain(String domain) {
         this.domain = domain;
+    }
+
+    public BusinessCredentials getBusinessCredentials() {
+        return businessCredentials;
     }
 
     public String getCurrency() {

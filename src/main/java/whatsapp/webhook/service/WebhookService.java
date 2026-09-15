@@ -11,6 +11,7 @@ import whatsapp.webhook.repository.CustomerConversationRepository;
 import whatsapp.webhook.repository.WhatsAppWebhookLogRepository;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -213,11 +214,11 @@ public class WebhookService {
                 conversation.setIsDelivered(1);
             }
             if ("sent".equalsIgnoreCase(statusValue)) {
-                conversation.setSentAt(LocalDateTime.now());
+                conversation.setSentAt(LocalDateTime.now(ZoneOffset.UTC));
             }
 
             if ("delivered".equalsIgnoreCase(statusValue)) {
-                conversation.setDeliveredAt(LocalDateTime.now());
+                conversation.setDeliveredAt(LocalDateTime.now(ZoneOffset.UTC));
             }
 //
 //            WhatsAppMessage message = new WhatsAppMessage();
@@ -239,8 +240,9 @@ public class WebhookService {
             conversation.setBillable(billable);
 
             if (conversation.getId() == null) {
-                conversation.setWindowOpenedAt(LocalDateTime.now());
-                conversation.setWindowExpiresAt(LocalDateTime.now().plusHours(24));
+                LocalDateTime nowUtc = LocalDateTime.now(ZoneOffset.UTC);
+                conversation.setWindowOpenedAt(nowUtc);
+                conversation.setWindowExpiresAt(nowUtc.plusHours(24));
             }
 
             conversationRepository.save(conversation);

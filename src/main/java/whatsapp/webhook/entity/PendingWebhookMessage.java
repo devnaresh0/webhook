@@ -2,6 +2,7 @@ package whatsapp.webhook.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "pending_webhook_messages")
@@ -27,7 +28,7 @@ public class PendingWebhookMessage {
     private String status = "PENDING";
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
 
     // =====================================================

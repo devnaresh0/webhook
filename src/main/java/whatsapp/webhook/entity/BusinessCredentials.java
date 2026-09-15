@@ -1,20 +1,22 @@
 package whatsapp.webhook.entity;
 
 import javax.persistence.*;
+import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "business_credentials")
-public class BusinessCredentials {
+public class BusinessCredentials implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "domain", nullable = false, unique = true)
     private String domain;
-
-    @Column(name = "serial_number")
-    private String serialNumber;
 
     @Column(name = "activation_key")
     private String activationKey;
@@ -25,30 +27,15 @@ public class BusinessCredentials {
     @Column(name = "license_status")
     private String licenseStatus;
 
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt =
-            LocalDateTime.now();
+            LocalDateTime.now(ZoneOffset.UTC);
+
     @Column(name = "is_static_ip")
     private Boolean isStaticIp;
 
-    // =====================================================
-    // IP ADDRESS
-    // =====================================================
-
-    public Boolean getStaticIp() {
-        return isStaticIp;
-    }
-
-    public void setStaticIp(Boolean staticIp) {
-        isStaticIp = staticIp;
-    }
-
     @Column(name = "ip_address")
     private String ipAddress;
-
 
     // =====================================================
     // GETTERS / SETTERS
@@ -62,7 +49,6 @@ public class BusinessCredentials {
         this.id = id;
     }
 
-
     public String getDomain() {
         return domain;
     }
@@ -70,16 +56,6 @@ public class BusinessCredentials {
     public void setDomain(String domain) {
         this.domain = domain;
     }
-
-
-    public String getSerialNumber() {
-        return serialNumber;
-    }
-
-    public void setSerialNumber(String serialNumber) {
-        this.serialNumber = serialNumber;
-    }
-
 
     public String getActivationKey() {
         return activationKey;
@@ -89,7 +65,6 @@ public class BusinessCredentials {
         this.activationKey = activationKey;
     }
 
-
     public String getActivationToken() {
         return activationToken;
     }
@@ -97,7 +72,6 @@ public class BusinessCredentials {
     public void setActivationToken(String activationToken) {
         this.activationToken = activationToken;
     }
-
 
     public String getLicenseStatus() {
         return licenseStatus;
@@ -107,36 +81,27 @@ public class BusinessCredentials {
         this.licenseStatus = licenseStatus;
     }
 
-
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(
-            LocalDateTime expiresAt) {
-
-        this.expiresAt = expiresAt;
-    }
-
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(
-            LocalDateTime createdAt) {
-
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
+    public Boolean getStaticIp() {
+        return isStaticIp;
+    }
+
+    public void setStaticIp(Boolean staticIp) {
+        isStaticIp = staticIp;
+    }
 
     public String getIpAddress() {
         return ipAddress;
     }
 
-    public void setIpAddress(
-            String ipAddress) {
-
+    public void setIpAddress(String ipAddress) {
         this.ipAddress = ipAddress;
     }
 }

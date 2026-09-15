@@ -8,7 +8,6 @@ import whatsapp.webhook.repository.BusinessCredentialRepository;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.time.LocalDateTime;
 
 @Component
 public class LicenseInterceptor implements HandlerInterceptor {
@@ -42,14 +41,6 @@ public class LicenseInterceptor implements HandlerInterceptor {
         if (!"ACTIVE".equalsIgnoreCase(credentials.getLicenseStatus())) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN,
                     "License Inactive");
-            return false;
-        }
-
-        if (credentials.getExpiresAt() != null &&
-                credentials.getExpiresAt().isBefore(LocalDateTime.now())) {
-
-            response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                    "License Expired");
             return false;
         }
 

@@ -69,11 +69,6 @@ public class LicenseActivationController {
         );
 
         System.out.println(
-                "Serial Number  : "
-                        + request.getSerialNumber()
-        );
-
-        System.out.println(
                 "Domain         : "
                         + request.getDomain()
         );

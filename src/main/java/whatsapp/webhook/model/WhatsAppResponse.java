@@ -2,6 +2,7 @@ package whatsapp.webhook.model;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "whatsapp_responses")
@@ -33,7 +34,7 @@ public class WhatsAppResponse {
     private String taskId;
 
     public WhatsAppResponse() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     // ================= SETTERS =================

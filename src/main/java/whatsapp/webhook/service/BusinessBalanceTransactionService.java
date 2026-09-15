@@ -7,6 +7,7 @@ import whatsapp.webhook.repository.BusinessBalanceTransactionRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 @Service
@@ -24,7 +25,7 @@ public class BusinessBalanceTransactionService {
                 new BusinessBalanceTransaction();
 
         transaction.setDomain(domain);
-        transaction.setTransactionDate(LocalDateTime.now());
+        transaction.setTransactionDate(LocalDateTime.now(ZoneOffset.UTC));
         transaction.setDataType("Op. Bal");
 
         transaction.setPricingCategory("-");
@@ -33,9 +34,11 @@ public class BusinessBalanceTransactionService {
         transaction.setLoadAmount(null);
         transaction.setCost(null);
 
-        transaction.setBalance(balance);
+        transaction.setBalance(
+                balance != null ? balance : BigDecimal.ZERO
+        );
 
-        transaction.setCreatedAt(LocalDateTime.now());
+        transaction.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         transactionRepository.save(transaction);
     }
@@ -50,7 +53,7 @@ public class BusinessBalanceTransactionService {
                 new BusinessBalanceTransaction();
 
         transaction.setDomain(domain);
-        transaction.setTransactionDate(LocalDateTime.now());
+        transaction.setTransactionDate(LocalDateTime.now(ZoneOffset.UTC));
         transaction.setDataType("Load");
 
         transaction.setPricingCategory("-");
@@ -60,9 +63,11 @@ public class BusinessBalanceTransactionService {
         transaction.setLoadAmount(loadAmount);
         transaction.setCost(null);
 
-        transaction.setBalance(balance);
+        transaction.setBalance(
+                balance != null ? balance : BigDecimal.ZERO
+        );
 
-        transaction.setCreatedAt(LocalDateTime.now());
+        transaction.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
 
         transactionRepository.save(transaction);
     }
@@ -114,7 +119,7 @@ public class BusinessBalanceTransactionService {
         transaction.setDomain(domain);
 
         transaction.setTransactionDate(
-                LocalDateTime.now()
+                LocalDateTime.now(ZoneOffset.UTC)
         );
 
         transaction.setDataType("Usage");
@@ -134,11 +139,11 @@ public class BusinessBalanceTransactionService {
         transaction.setLoadAmount(null);
 
         transaction.setCost(
-                cost
+                cost != null ? cost : BigDecimal.ZERO
         );
 
         transaction.setBalance(
-                balance
+                balance != null ? balance : BigDecimal.ZERO
         );
 
         transaction.setReferenceId(
@@ -146,7 +151,7 @@ public class BusinessBalanceTransactionService {
         );
 
         transaction.setCreatedAt(
-                LocalDateTime.now()
+                LocalDateTime.now(ZoneOffset.UTC)
         );
 
 
@@ -165,6 +170,11 @@ public class BusinessBalanceTransactionService {
         System.out.println(
                 "Reference ID = "
                         + referenceId
+        );
+
+        System.out.println(
+                "Balance = "
+                        + transaction.getBalance()
         );
     }
 }

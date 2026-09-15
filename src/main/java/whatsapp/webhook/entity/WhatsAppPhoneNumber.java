@@ -2,6 +2,7 @@ package whatsapp.webhook.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "whatsapp_phone_numbers")
@@ -11,7 +12,17 @@ public class WhatsAppPhoneNumber {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "domain", nullable = false)
     private String domain;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "domain",
+            referencedColumnName = "domain",
+            insertable = false,
+            updatable = false
+    )
+    private BusinessCredentials businessCredentials;
 
 //    @Column(name = "waba_id")
 //    private String wabaId;
@@ -28,7 +39,7 @@ public class WhatsAppPhoneNumber {
     private String status;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     // Getters & Setters
 
@@ -46,6 +57,10 @@ public class WhatsAppPhoneNumber {
 
     public void setDomain(String domain) {
         this.domain = domain;
+    }
+
+    public BusinessCredentials getBusinessCredentials() {
+        return businessCredentials;
     }
 
 //    public String getWabaId() {

@@ -36,7 +36,11 @@ public class WebhookPollingController {
             String authorization,
 
             @RequestParam("whatsappId")
-            String whatsappId) {
+            String whatsappId,
+
+            @RequestParam("domain")
+            String domain
+    ) {
 
         try {
 
@@ -78,12 +82,50 @@ public class WebhookPollingController {
             }
 
 
-            // 4. Get domain
-            String domain =
+            // 4. Validate domain
+            String credentialDomain =
                     credentials.getDomain();
 
+            if (domain == null ||
+                    domain.trim().isEmpty()) {
 
-            // 5. Get pending messages
+                return ResponseEntity
+                        .status(400)
+                        .body("Domain is required");
+            }
+
+            if (credentialDomain == null ||
+                    !credentialDomain.equals(domain)) {
+
+                return ResponseEntity
+                        .status(403)
+                        .body("Invalid domain for WhatsApp credentials");
+            }
+
+
+            // 5. Debug
+            System.out.println(
+                    "========== POLL DOMAIN DEBUG =========="
+            );
+
+            System.out.println(
+                    "WhatsApp ID       = " + whatsappId
+            );
+
+            System.out.println(
+                    "Credential Domain = [" + credentialDomain + "]"
+            );
+
+            System.out.println(
+                    "Requested Domain  = [" + domain + "]"
+            );
+
+            System.out.println(
+                    "======================================="
+            );
+
+
+            // 6. Get pending messages ONLY for this domain
             List<PendingWebhookMessage> messages =
                     pendingWebhookMessageRepository
                             .findByDomainAndWhatsappIdAndStatusOrderByCreatedAtAsc(
@@ -93,7 +135,7 @@ public class WebhookPollingController {
                             );
 
 
-            // 6. Return JSON
+            // 7. Return JSON
             return ResponseEntity.ok(messages);
 
         } catch (Exception e) {

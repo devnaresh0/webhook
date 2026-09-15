@@ -2,9 +2,13 @@ package whatsapp.webhook.entity;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "businesses")
@@ -14,13 +18,22 @@ public class Business {
     @Column(name = "domain")
     private String domain;
 
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "domain",
+            referencedColumnName = "domain",
+            insertable = false,
+            updatable = false
+    )
+    private BusinessCredentials businessCredentials;
+
     @Column(name = "business_name")
     private String businessName;
 
     private String status;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneOffset.UTC);
 
     // Getters & Setters
 
@@ -30,6 +43,10 @@ public class Business {
 
     public void setDomain(String domain) {
         this.domain = domain;
+    }
+
+    public BusinessCredentials getBusinessCredentials() {
+        return businessCredentials;
     }
 
     public String getBusinessName() {

@@ -12,8 +12,11 @@ import whatsapp.webhook.repository.MessagingRateRepository;
 import whatsapp.webhook.repository.WhatsAppPhoneNumberRepository;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,14 +46,20 @@ public class UsageService {
             String phoneNumberId,
             String fromDate,
             String toDate,
+            String timeZone,
             int page,
             int pageSize) {
 
-        LocalDateTime from =
-                LocalDate.parse(fromDate).atStartOfDay();
+        ZoneId zone = UsageUtcRange.resolveZone(timeZone);
 
-        LocalDateTime to =
-                LocalDate.parse(toDate).atTime(23, 59, 59);
+        // Caller calendar day in their zone → UTC range for DB (stored as UTC wall clock)
+        UsageUtcRange range = UsageUtcRange.of(
+                LocalDate.parse(fromDate),
+                LocalDate.parse(toDate),
+                zone
+        );
+        LocalDateTime from = range.fromInclusive;
+        LocalDateTime toExclusive = range.toExclusive;
 
 
         // ==========================================
@@ -73,19 +82,24 @@ public class UsageService {
         System.out.println("          GET USAGE DEBUG");
         System.out.println("==========================================");
         System.out.println("Phone Number ID : [" + phoneNumberId + "]");
-        System.out.println("From Date       : [" + from + "]");
-        System.out.println("To Date         : [" + to + "]");
+        System.out.println("Time Zone       : [" + zone + "]");
+        System.out.println("From UTC        : [" + from + "]");
+        System.out.println("To UTC (excl)   : [" + toExclusive + "]");
         System.out.println("Page            : [" + page + "]");
         System.out.println("Page Size       : [" + pageSize + "]");
         System.out.println("Offset          : [" + offset + "]");
         System.out.println("==========================================");
 
 
+        // Bind as UTC Timestamps so native queries are not shifted by the JVM zone
+        Timestamp fromTs = Timestamp.from(from.toInstant(ZoneOffset.UTC));
+        Timestamp toTs = Timestamp.from(toExclusive.toInstant(ZoneOffset.UTC));
+
         List<Object[]> rows =
                 conversationRepository.getUsage(
                         phoneNumberId,
-                        from,
-                        to,
+                        fromTs,
+                        toTs,
                         pageSize,
                         offset
                 );
@@ -134,8 +148,8 @@ public class UsageService {
         long totalItems =
                 conversationRepository.countUsage(
                         phoneNumberId,
-                        from,
-                        to
+                        fromTs,
+                        toTs
                 );
 
         System.out.println("==========================================");
@@ -155,8 +169,8 @@ public class UsageService {
         List<Object[]> categoryCounts =
                 conversationRepository.countMessagesByCategory(
                         phoneNumberId,
-                        from,
-                        to
+                        fromTs,
+                        toTs
                 );
 
 
@@ -239,6 +253,9 @@ public class UsageService {
             java.sql.Timestamp sentAt =
                     (java.sql.Timestamp) row[1];
 
+            String sentAtUtc =
+                    formatUtcInstant(sentAt);
+
 
             String category =
                     row[2] != null
@@ -263,37 +280,6 @@ public class UsageService {
 
 
             // ==========================================
-            // RATE
-            // ==========================================
-
-            Double rate =
-                    rateRepository
-                            .findFirstByPricingCategoryIgnoreCase(
-                                    category
-                            )
-                            .map(r ->
-                                    r.getPricePerConversation()
-                                            .doubleValue()
-                            )
-                            .orElse(0.0);
-
-
-            // ==========================================
-            // COST
-            // ==========================================
-
-            Double cost = 0.0;
-
-
-            if (Boolean.TRUE.equals(billable)
-                    && !"free_customer_service"
-                    .equalsIgnoreCase(pricingType)) {
-
-                cost = rate;
-            }
-
-
-            // ==========================================
             // DOMAIN
             // ==========================================
 
@@ -307,33 +293,36 @@ public class UsageService {
 
 
             // ==========================================
-            // HISTORICAL BALANCE
+            // LEDGER (source of truth for cost + balance)
             // ==========================================
 
-            Optional<BusinessBalanceTransaction>
-                    transaction =
-                    transactionRepository
-                            .findByReferenceId(messageId);
+            Optional<BusinessBalanceTransaction> ledger =
+                    (messageId != null && !messageId.trim().isEmpty())
+                            ? transactionRepository.findByReferenceId(messageId)
+                            : Optional.<BusinessBalanceTransaction>empty();
 
+
+            // ==========================================
+            // COST — only what was actually charged
+            // ==========================================
+
+            Double cost = 0.0;
+
+            if (ledger.isPresent() && ledger.get().getCost() != null) {
+                cost = ledger.get().getCost().doubleValue();
+            }
+
+
+            // ==========================================
+            // BALANCE — remaining wallet from ledger
+            // ==========================================
 
             BigDecimal rowBalance =
-                    transaction
-                            .map(
-                                    BusinessBalanceTransaction
-                                            ::getBalance
-                            )
-                            .orElse(null);
-
-
-            /*
-             * For old/free records where no
-             * transaction exists, keep balance
-             * null rather than using today's balance.
-             */
-            if (rowBalance == null) {
-
-                rowBalance = null;
-            }
+                    resolveUsageBalance(
+                            messageId,
+                            domain,
+                            sentAt
+                    );
 
 
             // ==========================================
@@ -346,13 +335,13 @@ public class UsageService {
 
             item.put(
                     "date",
-                    sentAt
+                    sentAtUtc
             );
 
 
             item.put(
                     "sent_at",
-                    sentAt
+                    sentAtUtc
             );
 
 
@@ -469,5 +458,61 @@ public class UsageService {
 
 
         return response;
+    }
+
+    /**
+     * DB stores UTC wall-clock in timestamp-without-time-zone.
+     * Return unambiguous Instant string so every client can show local time.
+     */
+    private String formatUtcInstant(Timestamp sentAt) {
+        if (sentAt == null) {
+            return null;
+        }
+        // Use Instant directly — Timestamp#toLocalDateTime() follows the JVM zone
+        // and would falsely re-label IST wall-clock as UTC (e.g. 18:30Z → 00:00Z).
+        return sentAt.toInstant().toString();
+    }
+
+    /**
+     * Prefer exact ledger row by message id, then nearest prior snapshot,
+     * then live wallet — never return null so the UI cannot go blank.
+     */
+    private BigDecimal resolveUsageBalance(
+            String messageId,
+            String domain,
+            Timestamp sentAt) {
+
+        return UsageBalanceResolver.resolve(
+                messageId,
+                domain,
+                sentAt,
+                new UsageBalanceResolver.Sources() {
+                    @Override
+                    public Optional<BigDecimal> balanceByReferenceId(String id) {
+                        return transactionRepository
+                                .findByReferenceId(id)
+                                .map(BusinessBalanceTransaction::getBalance);
+                    }
+
+                    @Override
+                    public Optional<BigDecimal> priorBalance(
+                            String d,
+                            java.time.LocalDateTime at) {
+                        return transactionRepository
+                                .findTopByDomainAndTransactionDateLessThanEqualOrderByTransactionDateDescIdDesc(
+                                        d,
+                                        at
+                                )
+                                .map(BusinessBalanceTransaction::getBalance);
+                    }
+
+                    @Override
+                    public Optional<BigDecimal> liveWallet(String d) {
+                        return balanceRepository
+                                .findById(d)
+                                .map(b -> b.getBalance());
+                    }
+                }
+        );
     }
 }

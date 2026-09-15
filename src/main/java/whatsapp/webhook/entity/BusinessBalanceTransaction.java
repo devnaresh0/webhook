@@ -14,11 +14,20 @@ public class BusinessBalanceTransaction {
 
 
     // =====================================================
-    // DOMAIN
+    // DOMAIN (FK → business_credentials.domain)
     // =====================================================
 
-    @Column(name = "domain")
+    @Column(name = "domain", nullable = false)
     private String domain;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "domain",
+            referencedColumnName = "domain",
+            insertable = false,
+            updatable = false
+    )
+    private BusinessCredentials businessCredentials;
 
 
     // =====================================================
@@ -78,10 +87,10 @@ public class BusinessBalanceTransaction {
 
 
     // =====================================================
-    // BALANCE
+    // BALANCE (snapshot after this transaction — never blank)
     // =====================================================
 
-    @Column(name = "balance")
+    @Column(name = "balance", nullable = false)
     private BigDecimal balance;
 
 
@@ -132,6 +141,10 @@ public class BusinessBalanceTransaction {
 
     public void setDomain(String domain) {
         this.domain = domain;
+    }
+
+    public BusinessCredentials getBusinessCredentials() {
+        return businessCredentials;
     }
 
 
