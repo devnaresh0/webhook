@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import whatsapp.webhook.model.WhatsAppResponse;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface WhatsAppResponseRepository
         extends JpaRepository<WhatsAppResponse, Long> {
@@ -26,4 +27,22 @@ public interface WhatsAppResponseRepository
     List<WhatsAppResponse> findByPoIdAndLevel(String poId, int level);
 
     boolean existsByTaskIdAndLevel(String taskId, int level);
+
+    boolean existsByDomainAndTaskIdAndLevel(
+            String domain,
+            String taskId,
+            int level
+    );
+
+    List<WhatsAppResponse> findByDomainAndTaskIdAndLevel(
+            String domain,
+            String taskId,
+            int level
+    );
+
+    Optional<WhatsAppResponse> findFirstByDomainAndTaskIdAndLevelOrderByIdAsc(
+            String domain,
+            String taskId,
+            int level
+    );
 }

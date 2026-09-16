@@ -3,13 +3,16 @@ package whatsapp.webhook.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import whatsapp.webhook.entity.BusinessBalanceTransaction;
+import whatsapp.webhook.entity.WhatsAppMessageLink;
 import whatsapp.webhook.entity.WhatsAppPhoneNumber;
+import whatsapp.webhook.model.WhatsAppResponse;
 
 import whatsapp.webhook.repository.BusinessBalanceRepository;
 import whatsapp.webhook.repository.BusinessBalanceTransactionRepository;
 import whatsapp.webhook.repository.CustomerConversationRepository;
 import whatsapp.webhook.repository.MessagingRateRepository;
 import whatsapp.webhook.repository.WhatsAppPhoneNumberRepository;
+import whatsapp.webhook.repository.WhatsAppResponseRepository;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -40,6 +43,12 @@ public class UsageService {
 
     @Autowired
     private WhatsAppPhoneNumberRepository phoneRepository;
+
+    @Autowired
+    private WhatsAppMessageLinkService messageLinkService;
+
+    @Autowired
+    private WhatsAppResponseRepository responseRepository;
 
 
     public Map<String, Object> getUsage(
@@ -242,6 +251,7 @@ public class UsageService {
              * 4 = pricing_type
              * 5 = billable
              * 6 = phone_number_id
+             * 7 = customer_phone (receiver)
              */
 
             String messageId =
@@ -276,6 +286,12 @@ public class UsageService {
             String rowPhoneNumberId =
                     row[6] != null
                             ? row[6].toString()
+                            : "";
+
+
+            String receiver =
+                    row.length > 7 && row[7] != null
+                            ? row[7].toString()
                             : "";
 
 
@@ -392,6 +408,26 @@ public class UsageService {
                     rowPhoneNumberId
             );
 
+            item.put(
+                    "receiver",
+                    receiver
+            );
+
+            Map<String, Object> decision =
+                    resolveDecision(messageId);
+            Object decisionValue = decision.get("decision");
+            item.put(
+                    "decision",
+                    decisionValue != null && !String.valueOf(decisionValue).trim().isEmpty()
+                            ? decisionValue
+                            : "Pending"
+            );
+            item.put("decision_action", decision.get("decision_action"));
+            item.put("task_id", decision.get("task_id"));
+            item.put("po_id", decision.get("po_id"));
+            item.put("level", decision.get("level"));
+            item.put("domain", decision.get("domain"));
+
 
             result.add(item);
         }
@@ -471,6 +507,75 @@ public class UsageService {
         // Use Instant directly — Timestamp#toLocalDateTime() follows the JVM zone
         // and would falsely re-label IST wall-clock as UTC (e.g. 18:30Z → 00:00Z).
         return sentAt.toInstant().toString();
+    }
+
+    /**
+     * Match usage message_id → outbound link → approval response.
+     * Returns Accepted / Rejected / Pending (never null for UI).
+     */
+    private Map<String, Object> resolveDecision(String messageId) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        out.put("decision", "Pending");
+        out.put("decision_action", null);
+        out.put("task_id", null);
+        out.put("po_id", null);
+        out.put("level", null);
+        out.put("domain", null);
+
+        if (messageId == null || messageId.trim().isEmpty()) {
+            return out;
+        }
+
+        Optional<WhatsAppMessageLink> linkOpt =
+                messageLinkService.findByMessageId(messageId);
+        if (!linkOpt.isPresent()) {
+            return out;
+        }
+
+        WhatsAppMessageLink link = linkOpt.get();
+        out.put("task_id", link.getTaskId());
+        out.put("po_id", link.getPoId());
+        out.put("level", link.getLevel());
+        out.put("domain", link.getDomain());
+
+        Optional<WhatsAppResponse> responseOpt =
+                responseRepository.findFirstByDomainAndTaskIdAndLevelOrderByIdAsc(
+                        link.getDomain(),
+                        link.getTaskId(),
+                        link.getLevel()
+                );
+
+        if (!responseOpt.isPresent()) {
+            // Legacy rows without domain
+            List<WhatsAppResponse> legacy =
+                    responseRepository.findByTaskIdAndLevel(
+                            link.getTaskId(),
+                            link.getLevel()
+                    );
+            if (legacy != null && !legacy.isEmpty()) {
+                responseOpt = Optional.of(legacy.get(0));
+            }
+        }
+
+        if (!responseOpt.isPresent()) {
+            out.put("decision", "Pending");
+            return out;
+        }
+
+        String action = responseOpt.get().getAction();
+        out.put("decision_action", action);
+
+        if (action != null && "APPROVE".equalsIgnoreCase(action.trim())) {
+            out.put("decision", "Accepted");
+        } else if (action != null && "REJECT".equalsIgnoreCase(action.trim())) {
+            out.put("decision", "Rejected");
+        } else if (action == null || action.trim().isEmpty()) {
+            out.put("decision", "Pending");
+        } else {
+            out.put("decision", action);
+        }
+
+        return out;
     }
 
     /**

@@ -62,10 +62,14 @@ public class ApprovalService {
             int localId = Integer.parseInt(parts[9]);
 
             // -------- DUPLICATE CLICK --------
-            if (repository.existsByTaskIdAndLevel(taskId, level)) {
+            if (repository.existsByDomainAndTaskIdAndLevel(domain, taskId, level)
+                    || repository.existsByTaskIdAndLevel(taskId, level)) {
 
                 List<WhatsAppResponse> list =
-                        repository.findByTaskIdAndLevel(taskId, level);
+                        repository.findByDomainAndTaskIdAndLevel(domain, taskId, level);
+                if (list == null || list.isEmpty()) {
+                    list = repository.findByTaskIdAndLevel(taskId, level);
+                }
 
                 if (list.isEmpty()) {
                     return;
@@ -85,6 +89,7 @@ public class ApprovalService {
             // -------- NEW APPROVAL --------
             WhatsAppResponse entity = new WhatsAppResponse();
             entity.setPhone(phone);
+            entity.setDomain(domain);
             entity.setPoId(String.valueOf(poId));
             entity.setAction(action);
             entity.setTaskId(taskId);

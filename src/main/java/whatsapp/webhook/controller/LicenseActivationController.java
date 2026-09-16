@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 import whatsapp.webhook.model.ActivationRequest;
 import whatsapp.webhook.model.ActivationResponse;
 import whatsapp.webhook.service.LicenseService;
+import whatsapp.webhook.service.WhatsAppMessageLinkService;
 
 import java.util.Map;
 
@@ -35,6 +36,9 @@ public class LicenseActivationController {
 
     @Autowired
     private LicenseService licenseService;
+
+    @Autowired
+    private WhatsAppMessageLinkService messageLinkService;
 
 
     // =========================================================
@@ -502,6 +506,14 @@ public class LicenseActivationController {
                     "✅ WhatsApp Meta Response: "
                             + response.getBody()
             );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                messageLinkService.saveFromSend(
+                        domain,
+                        payload,
+                        response.getBody()
+                );
+            }
 
 
             return ResponseEntity

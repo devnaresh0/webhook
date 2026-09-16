@@ -37,7 +37,8 @@ public interface CustomerConversationRepository
                     "pricing_model, " +
                     "pricing_type, " +
                     "billable, " +
-                    "phone_number_id " +
+                    "phone_number_id, " +
+                    "customer_phone " +
                     "FROM customer_conversations " +
                     "WHERE phone_number_id = :phoneNumberId " +
                     "AND sent_at >= :fromDate AND sent_at < :toDate " +

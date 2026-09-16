@@ -5,7 +5,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Entity
-@Table(name = "whatsapp_responses")
+@Table(
+        name = "whatsapp_responses",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_wr_domain_task_level",
+                columnNames = {"domain", "task_id", "level"}
+        )
+)
 public class WhatsAppResponse {
 
     @Id
@@ -14,10 +20,15 @@ public class WhatsAppResponse {
 
     private String phone;
 
+    @Column(name = "domain")
+    private String domain;
+
     @Column(name = "po_id")
     private String poId;
+
     @Column(name = "level")
     private Integer level;
+
     private String action;
 
     @Column(name = "response_json", columnDefinition = "TEXT")
@@ -29,17 +40,19 @@ public class WhatsAppResponse {
     @Column(name = "user_name")
     private String userName;
 
-    // 🔥 NEW FIELD (VERY IMPORTANT)
-    @Column(name = "task_id", unique = true)
+    @Column(name = "task_id")
     private String taskId;
 
     public WhatsAppResponse() {
         this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
-    // ================= SETTERS =================
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public void setDomain(String domain) {
+        this.domain = domain;
     }
 
     public void setPoId(String poId) {
@@ -58,14 +71,16 @@ public class WhatsAppResponse {
         this.userName = userName;
     }
 
-    // 🔥 NEW SETTER
     public void setTaskId(String taskId) {
         this.taskId = taskId;
     }
 
-    // ================= GETTERS =================
     public String getPhone() {
         return phone;
+    }
+
+    public String getDomain() {
+        return domain;
     }
 
     public String getPoId() {
@@ -84,10 +99,10 @@ public class WhatsAppResponse {
         return userName;
     }
 
-    // 🔥 NEW GETTER
     public String getTaskId() {
         return taskId;
     }
+
     public int getLevel() {
         return level;
     }
