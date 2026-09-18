@@ -7,6 +7,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import whatsapp.webhook.entity.BusinessCredentials;
 import whatsapp.webhook.entity.PendingWebhookMessage;
+import whatsapp.webhook.entity.WhatsAppMessageLink;
 import whatsapp.webhook.model.WhatsAppResponse;
 import whatsapp.webhook.repository.BusinessCredentialRepository;
 import whatsapp.webhook.repository.PendingWebhookMessageRepository;
@@ -27,16 +28,29 @@ public class ApprovalService {
     @Autowired
     private PendingWebhookMessageRepository pendingWebhookMessageRepository;
 
+    @Autowired
+    private WhatsAppMessageLinkService messageLinkService;
+
     // ================= MAIN METHOD =================
     public void processApproval(String phone,
                                 String action,
                                 Map<String, Object> responseJson,
                                 String userName,
                                 String reason) {
+        processApproval(phone, action, responseJson, userName, reason, null);
+    }
+
+    public void processApproval(String phone,
+                                String action,
+                                Map<String, Object> responseJson,
+                                String userName,
+                                String reason,
+                                String contextMessageId) {
 
         try {
             System.out.println("========== PROCESSING APPROVAL ==========");
             System.out.println("Reason = " + reason);
+            System.out.println("Context message id = " + contextMessageId);
 
             String token = (String) ((Map) responseJson).get("flow_token");
 
@@ -61,7 +75,9 @@ public class ApprovalService {
             int tenantId = Integer.parseInt(parts[8]);
             int localId = Integer.parseInt(parts[9]);
 
-            // -------- DUPLICATE CLICK --------
+            // -------- DUPLICATE / ALREADY APPROVED (must run before supersede) --------
+            // If one of several Level-N recipients already approved, others get this
+            // message — not the "document updated" text.
             if (repository.existsByDomainAndTaskIdAndLevel(domain, taskId, level)
                     || repository.existsByTaskIdAndLevel(taskId, level)) {
 
@@ -82,6 +98,24 @@ public class ApprovalService {
                         phone,
                         poNumber + " ✅ Already approved at Level " + level
                                 + " by " + approvedBy
+                );
+                return;
+            }
+
+            // -------- SUPERSEDED (doc updated / workflow moved on) --------
+            if (contextMessageId != null && !contextMessageId.trim().isEmpty()
+                    && messageLinkService.isMessageSuperseded(contextMessageId.trim())) {
+                System.out.println(
+                        "Superseded approval blocked for message_id="
+                                + contextMessageId
+                );
+                sendWhatsAppMessage(
+                        domain,
+                        phone,
+                        poNumber
+                                + " ⚠️ This approval is no longer valid. "
+                                + "The document was updated and a new approval "
+                                + "message was sent. Please use the latest message."
                 );
                 return;
             }

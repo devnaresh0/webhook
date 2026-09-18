@@ -74,13 +74,32 @@ public class ConversationService {
             return;
         }
 
-        processFlowReply(phone, contacts, nfmReply);
+        String contextMessageId = extractContextMessageId(message);
+        processFlowReply(phone, contacts, nfmReply, contextMessageId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractContextMessageId(Map<String, Object> message) {
+        if (message == null) {
+            return null;
+        }
+        Object contextObj = message.get("context");
+        if (!(contextObj instanceof Map)) {
+            return null;
+        }
+        Object id = ((Map<String, Object>) contextObj).get("id");
+        if (id == null) {
+            return null;
+        }
+        String value = String.valueOf(id).trim();
+        return value.isEmpty() ? null : value;
     }
 
     @SuppressWarnings("unchecked")
     private void processFlowReply(String phone,
                                   List<Map<String, Object>> contacts,
-                                  Map<String, Object> nfmReply) {
+                                  Map<String, Object> nfmReply,
+                                  String contextMessageId) {
 
         Object responseObj = nfmReply.get("response_json");
 
@@ -107,6 +126,7 @@ public class ConversationService {
         }
 
         System.out.println("Flow response_json: " + responseJson);
+        System.out.println("Flow context message id: " + contextMessageId);
 
         String userName = extractUserName(responseJson, contacts);
         String action = extractAction(responseJson);
@@ -119,7 +139,9 @@ public class ConversationService {
 
         System.out.println("Reason : " + reason);
 
-        approvalService.processApproval(phone, action, responseJson, userName, reason);
+        approvalService.processApproval(
+                phone, action, responseJson, userName, reason, contextMessageId
+        );
     }
 
     @SuppressWarnings("unchecked")

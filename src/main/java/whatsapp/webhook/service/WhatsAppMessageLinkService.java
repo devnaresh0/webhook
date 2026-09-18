@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import whatsapp.webhook.entity.WhatsAppMessageLink;
 import whatsapp.webhook.repository.WhatsAppMessageLinkRepository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -23,8 +25,9 @@ public class WhatsAppMessageLinkService {
 
     /**
      * Persist outbound Meta message id with workflow keys from flow_token.
-     * Idempotent on message_id and on (domain, task_id, po_id, level).
+     * On resend for the same domain/po/level/recipient user, older links are marked inactive.
      */
+    @Transactional
     public void saveFromSend(
             String domain,
             Map<String, Object> payload,
@@ -55,6 +58,7 @@ public class WhatsAppMessageLinkService {
             }
 
             String taskId = parts[0].trim();
+            String recipientUserId = parts[1].trim();
             String poId = parts[2].trim();
             String poNumber = parts[3].trim();
             int level = Integer.parseInt(parts[6].trim());
@@ -66,25 +70,25 @@ public class WhatsAppMessageLinkService {
                             : tokenDomain;
 
             String phone = payload != null && payload.get("to") != null
-                    ? String.valueOf(payload.get("to"))
+                    ? String.valueOf(payload.get("to")).trim()
                     : null;
+            if (phone != null && phone.isEmpty()) {
+                phone = null;
+            }
 
-            Optional<WhatsAppMessageLink> byKeys =
-                    linkRepository.findByDomainAndTaskIdAndPoIdAndLevel(
-                            resolvedDomain,
-                            taskId,
-                            poId,
-                            level
-                    );
-
-            if (byKeys.isPresent()) {
-                WhatsAppMessageLink existing = byKeys.get();
-                // Keep first outbound id; do not overwrite on resend
+            int superseded = deactivateOlderLinks(
+                    resolvedDomain, poId, level, recipientUserId
+            );
+            int lowerLevels = deactivateLowerLevelLinks(resolvedDomain, poId, level);
+            if (superseded > 0 || lowerLevels > 0) {
                 System.out.println(
-                        "Link already exists for domain/task/po/level — keeping message_id="
-                                + existing.getMessageId()
+                        "Superseded " + superseded
+                                + " same-level + " + lowerLevels
+                                + " lower-level link(s) for domain=" + resolvedDomain
+                                + " po=" + poId
+                                + " level=" + level
+                                + " recipientUserId=" + recipientUserId
                 );
-                return;
             }
 
             WhatsAppMessageLink link = new WhatsAppMessageLink();
@@ -95,6 +99,8 @@ public class WhatsAppMessageLinkService {
             link.setLevel(level);
             link.setPoNumber(poNumber);
             link.setPhone(phone);
+            link.setRecipientUserId(recipientUserId);
+            link.setActive(Boolean.TRUE);
 
             try {
                 linkRepository.save(link);
@@ -104,6 +110,8 @@ public class WhatsAppMessageLinkService {
                                 + " task=" + taskId
                                 + " po=" + poId
                                 + " level=" + level
+                                + " recipientUserId=" + recipientUserId
+                                + " active=true"
                 );
             } catch (DataIntegrityViolationException e) {
                 System.out.println(
@@ -114,6 +122,135 @@ public class WhatsAppMessageLinkService {
             System.out.println("❌ Failed to save message link: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Mark prior active outbound approvals for this recipient user/doc/level inactive.
+     * Keyed by recipient user id (not phone) so multiple approvers sharing one
+     * WhatsApp number keep their own active messages.
+     */
+    int deactivateOlderLinks(
+            String domain,
+            String poId,
+            int level,
+            String recipientUserId) {
+
+        if (recipientUserId == null || recipientUserId.trim().isEmpty()) {
+            System.out.println(
+                    "Skip supersede deactivate — recipientUserId missing"
+                            + " (domain=" + domain
+                            + " po=" + poId
+                            + " level=" + level + ")"
+            );
+            return 0;
+        }
+
+        List<WhatsAppMessageLink> older =
+                linkRepository.findByDomainAndPoIdAndLevelAndRecipientUserIdAndActiveTrue(
+                        domain, poId, level, recipientUserId.trim()
+                );
+
+        if (older == null || older.isEmpty()) {
+            return 0;
+        }
+
+        for (WhatsAppMessageLink existing : older) {
+            existing.setActive(Boolean.FALSE);
+            linkRepository.save(existing);
+            System.out.println(
+                    "Deactivated message link id=" + existing.getId()
+                            + " message_id=" + existing.getMessageId()
+                            + " recipientUserId=" + recipientUserId
+            );
+        }
+        return older.size();
+    }
+
+    /**
+     * When a higher workflow level is notified, older-level WhatsApp approvals
+     * for this PO are no longer valid (e.g. L1 bubble after L2 was sent / update).
+     */
+    int deactivateLowerLevelLinks(String domain, String poId, int level) {
+        if (level <= 1) {
+            return 0;
+        }
+
+        List<WhatsAppMessageLink> lower =
+                linkRepository.findByDomainAndPoIdAndActiveTrueAndLevelLessThan(
+                        domain, poId, level
+                );
+
+        if (lower == null || lower.isEmpty()) {
+            return 0;
+        }
+
+        for (WhatsAppMessageLink existing : lower) {
+            existing.setActive(Boolean.FALSE);
+            linkRepository.save(existing);
+            System.out.println(
+                    "Deactivated lower-level link id=" + existing.getId()
+                            + " message_id=" + existing.getMessageId()
+                            + " level=" + existing.getLevel()
+            );
+        }
+        return lower.size();
+    }
+
+    /**
+     * True when this outbound message should no longer accept Flow replies.
+     */
+    public boolean isMessageSuperseded(String messageId) {
+        if (messageId == null || messageId.trim().isEmpty()) {
+            return false;
+        }
+
+        Optional<WhatsAppMessageLink> linkOpt =
+                linkRepository.findByMessageId(messageId.trim());
+        if (!linkOpt.isPresent()) {
+            return false;
+        }
+
+        WhatsAppMessageLink link = linkOpt.get();
+        if (!link.isActive()) {
+            return true;
+        }
+
+        // Workflow already moved past this message's level
+        if (linkRepository.existsByDomainAndPoIdAndActiveTrueAndLevelGreaterThan(
+                link.getDomain(), link.getPoId(), link.getLevel())) {
+            return true;
+        }
+
+        // A newer active message exists for the same recipient at this level
+        if (link.getRecipientUserId() != null) {
+            List<WhatsAppMessageLink> activeSameUser =
+                    linkRepository.findByDomainAndPoIdAndLevelAndRecipientUserIdAndActiveTrue(
+                            link.getDomain(),
+                            link.getPoId(),
+                            link.getLevel(),
+                            link.getRecipientUserId()
+                    );
+            if (activeSameUser != null) {
+                for (WhatsAppMessageLink other : activeSameUser) {
+                    if (other.getId() != null
+                            && link.getId() != null
+                            && other.getId() > link.getId()) {
+                        return true;
+                    }
+                    if (other.getMessageId() != null
+                            && !other.getMessageId().equals(link.getMessageId())) {
+                        // Another active link for same user/level — treat this as stale
+                        if (other.getCreatedAt() != null
+                                && link.getCreatedAt() != null
+                                && other.getCreatedAt().isAfter(link.getCreatedAt())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     public Optional<WhatsAppMessageLink> findByMessageId(String messageId) {

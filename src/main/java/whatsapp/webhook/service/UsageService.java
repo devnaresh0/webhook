@@ -558,7 +558,12 @@ public class UsageService {
         }
 
         if (!responseOpt.isPresent()) {
-            out.put("decision", "Pending");
+            // Old outbound message replaced by a newer send for same doc/level
+            if (!link.isActive()) {
+                out.put("decision", "Superseded");
+            } else {
+                out.put("decision", "Pending");
+            }
             return out;
         }
 
