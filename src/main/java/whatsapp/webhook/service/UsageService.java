@@ -510,8 +510,8 @@ public class UsageService {
     }
 
     /**
-     * Match usage message_id → outbound link → approval response.
-     * Returns Accepted / Rejected / Pending (never null for UI).
+     * Match usage message_id → outbound link → approval for that specific recipient only.
+     * Peer messages at the same level stay Pending until that recipient acts.
      */
     private Map<String, Object> resolveDecision(String messageId) {
         Map<String, Object> out = new HashMap<String, Object>();
@@ -538,49 +538,142 @@ public class UsageService {
         out.put("level", link.getLevel());
         out.put("domain", link.getDomain());
 
-        Optional<WhatsAppResponse> responseOpt =
-                responseRepository.findFirstByDomainAndTaskIdAndLevelOrderByIdAsc(
-                        link.getDomain(),
-                        link.getTaskId(),
-                        link.getLevel()
-                );
+        Optional<WhatsAppResponse> responseOpt = findRecipientResponse(link);
 
-        if (!responseOpt.isPresent()) {
-            // Legacy rows without domain
-            List<WhatsAppResponse> legacy =
-                    responseRepository.findByTaskIdAndLevel(
-                            link.getTaskId(),
-                            link.getLevel()
-                    );
-            if (legacy != null && !legacy.isEmpty()) {
-                responseOpt = Optional.of(legacy.get(0));
-            }
-        }
+        if (responseOpt.isPresent()) {
+            String action = responseOpt.get().getAction();
+            out.put("decision_action", action);
 
-        if (!responseOpt.isPresent()) {
-            // Old outbound message replaced by a newer send for same doc/level
-            if (!link.isActive()) {
-                out.put("decision", "Superseded");
-            } else {
+            if (action != null && "APPROVE".equalsIgnoreCase(action.trim())) {
+                out.put("decision", "Accepted");
+            } else if (action != null && "REJECT".equalsIgnoreCase(action.trim())) {
+                out.put("decision", "Rejected");
+            } else if (action == null || action.trim().isEmpty()) {
                 out.put("decision", "Pending");
+            } else {
+                out.put("decision", action);
             }
             return out;
         }
 
-        String action = responseOpt.get().getAction();
-        out.put("decision_action", action);
+        out.put("decision", "Pending");
+        return out;
+    }
 
-        if (action != null && "APPROVE".equalsIgnoreCase(action.trim())) {
-            out.put("decision", "Accepted");
-        } else if (action != null && "REJECT".equalsIgnoreCase(action.trim())) {
-            out.put("decision", "Rejected");
-        } else if (action == null || action.trim().isEmpty()) {
-            out.put("decision", "Pending");
-        } else {
-            out.put("decision", action);
+    /**
+     * Only the outbound message whose recipient_user_id matches the Flow reply
+     * (flow_token parts[1]) is Accepted/Rejected — not every send at that level.
+     */
+    private Optional<WhatsAppResponse> findRecipientResponse(WhatsAppMessageLink link) {
+        List<WhatsAppResponse> candidates = new ArrayList<WhatsAppResponse>();
+
+        if (link.getDomain() != null && link.getTaskId() != null && link.getLevel() != null) {
+            List<WhatsAppResponse> byDomainTask =
+                    responseRepository.findByDomainAndTaskIdAndLevel(
+                            link.getDomain(),
+                            link.getTaskId(),
+                            link.getLevel()
+                    );
+            addAllUnique(candidates, byDomainTask);
         }
 
-        return out;
+        if (link.getTaskId() != null && link.getLevel() != null) {
+            addAllUnique(
+                    candidates,
+                    responseRepository.findByTaskIdAndLevel(
+                            link.getTaskId(),
+                            link.getLevel()
+                    )
+            );
+        }
+
+        if (link.getPoId() != null && link.getLevel() != null) {
+            addAllUnique(
+                    candidates,
+                    responseRepository.findByPoIdAndLevel(
+                            link.getPoId(),
+                            link.getLevel()
+                    )
+            );
+        }
+
+        for (WhatsAppResponse response : candidates) {
+            if (responseBelongsToLink(link, response)) {
+                return Optional.of(response);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void addAllUnique(
+            List<WhatsAppResponse> target,
+            List<WhatsAppResponse> source) {
+        if (source == null || source.isEmpty()) {
+            return;
+        }
+        for (WhatsAppResponse item : source) {
+            if (item == null || item.getId() == null) {
+                continue;
+            }
+            boolean exists = false;
+            for (WhatsAppResponse existing : target) {
+                if (item.getId().equals(existing.getId())) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                target.add(item);
+            }
+        }
+    }
+
+    private boolean responseBelongsToLink(
+            WhatsAppMessageLink link,
+            WhatsAppResponse response) {
+        String tokenUserId = extractFlowTokenUserId(response.getResponseJson());
+        if (link.getRecipientUserId() != null
+                && !link.getRecipientUserId().trim().isEmpty()
+                && tokenUserId != null) {
+            return link.getRecipientUserId().trim().equals(tokenUserId.trim());
+        }
+        return false;
+    }
+
+    /**
+     * flow_token = taskId|userId|poId|... → return userId (parts[1]).
+     */
+    String extractFlowTokenUserId(String responseJson) {
+        if (responseJson == null || responseJson.trim().isEmpty()) {
+            return null;
+        }
+        String marker = "\"flow_token\"";
+        int key = responseJson.indexOf(marker);
+        if (key < 0) {
+            return null;
+        }
+        int colon = responseJson.indexOf(':', key + marker.length());
+        if (colon < 0) {
+            return null;
+        }
+        int firstQuote = responseJson.indexOf('"', colon + 1);
+        if (firstQuote < 0) {
+            return null;
+        }
+        int secondQuote = responseJson.indexOf('"', firstQuote + 1);
+        if (secondQuote < 0) {
+            return null;
+        }
+        String token = responseJson.substring(firstQuote + 1, secondQuote).trim();
+        if (!token.contains("|")) {
+            return null;
+        }
+        String[] parts = token.split("\\|");
+        if (parts.length < 2) {
+            return null;
+        }
+        String userId = parts[1].trim();
+        return userId.isEmpty() ? null : userId;
     }
 
     /**

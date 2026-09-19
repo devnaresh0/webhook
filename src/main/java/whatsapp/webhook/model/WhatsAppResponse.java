@@ -47,6 +47,14 @@ public class WhatsAppResponse {
         this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public void setPhone(String phone) {
         this.phone = phone;
     }

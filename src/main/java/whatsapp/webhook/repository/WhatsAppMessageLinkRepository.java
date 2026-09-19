@@ -31,4 +31,10 @@ public interface WhatsAppMessageLinkRepository
             String poId,
             Integer level
     );
+
+    boolean existsByDomainAndPoIdAndLevelGreaterThan(
+            String domain,
+            String poId,
+            Integer level
+    );
 }

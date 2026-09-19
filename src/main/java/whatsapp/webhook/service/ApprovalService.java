@@ -114,7 +114,7 @@ public class ApprovalService {
                         phone,
                         poNumber
                                 + " ⚠️ This approval is no longer valid. "
-                                + "The document was updated and a new approval "
+                                + "The message was updated and a new approval "
                                 + "message was sent. Please use the latest message."
                 );
                 return;
@@ -235,6 +235,7 @@ public class ApprovalService {
             request.put("createdBy", createdBy);
             request.put("level", level);
             request.put("reason", reason);
+            request.put("channel", "WHATSAPP");
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -291,6 +292,7 @@ public class ApprovalService {
             request.put("createdBy", createdBy);
             request.put("level", level);
             request.put("reason", reason);
+            request.put("channel", "WHATSAPP");
 
             PendingWebhookMessage pending = new PendingWebhookMessage();
             pending.setDomain(domain);

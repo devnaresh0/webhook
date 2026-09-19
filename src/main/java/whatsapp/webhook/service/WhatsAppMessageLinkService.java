@@ -253,6 +253,29 @@ public class WhatsAppMessageLinkService {
         return false;
     }
 
+    /**
+     * True if any outbound approval exists for a higher workflow level on this PO
+     * (means lower levels are already past — show Accepted on usage even without
+     * a WhatsApp reply at that lower level).
+     */
+    public boolean hasHigherLevelMessage(String domain, String poId, int level) {
+        if (domain == null || poId == null) {
+            return false;
+        }
+        return linkRepository.existsByDomainAndPoIdAndLevelGreaterThan(
+                domain, poId, level
+        );
+    }
+
+    public boolean hasActiveHigherLevel(String domain, String poId, int level) {
+        if (domain == null || poId == null) {
+            return false;
+        }
+        return linkRepository.existsByDomainAndPoIdAndActiveTrueAndLevelGreaterThan(
+                domain, poId, level
+        );
+    }
+
     public Optional<WhatsAppMessageLink> findByMessageId(String messageId) {
         if (messageId == null || messageId.trim().isEmpty()) {
             return Optional.empty();
